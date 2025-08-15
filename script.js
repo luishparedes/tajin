@@ -1,7 +1,7 @@
-// ===== SISTEMA DE ACTUALIZACI”N AUTOM¡TICA ===== //
-const VERSION_ACTUAL = "1.2.0"; // Nueva versiÛn
+// ===== SISTEMA DE ACTUALIZACI√ìN AUTOM√ÅTICA ===== //
+const VERSION_ACTUAL = "1.2.1"; // Versi√≥n corregida
 
-// Verificar si hay una nueva versiÛn
+// Verificar si hay una nueva versi√≥n
 function verificarActualizacion() {
     const versionGuardada = localStorage.getItem('appVersion');
     
@@ -9,7 +9,7 @@ function verificarActualizacion() {
         localStorage.setItem('appVersion', VERSION_ACTUAL);
         
         if (versionGuardada !== null) {
-            mostrarToast("°Nueva actualizaciÛn disponible! La app se recargar· autom·ticamente.", "info");
+            mostrarToast("¬°Nueva actualizaci√≥n disponible! La app se recargar√° autom√°ticamente.", "info");
             
             setTimeout(() => {
                 window.location.reload(true);
@@ -18,13 +18,13 @@ function verificarActualizacion() {
     }
 }
 
-// ===== DETECCI”N DE DISPOSITIVO M”VIL ===== //
+// ===== DETECCI√ìN DE DISPOSITIVO M√ìVIL ===== //
 function esDispositivoMovil() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
            window.innerWidth <= 768;
 }
 
-// ===== INACTIVIDAD Y REDIRECCI”N ===== //
+// ===== INACTIVIDAD Y REDIRECCI√ìN ===== //
 let temporizadorInactividad;
 
 function reiniciarTemporizadorInactividad() {
@@ -34,7 +34,7 @@ function reiniciarTemporizadorInactividad() {
     }, 600000); // 10 minutos (600,000 ms)
 }
 
-// ===== FUNCI”N PARA COPIAR AL PORTAPAPELES ===== //
+// ===== FUNCI√ìN PARA COPIAR AL PORTAPAPELES ===== //
 function copiarAlPortapapeles(texto) {
     if (navigator.clipboard) {
         navigator.clipboard.writeText(texto).then(() => {
@@ -71,6 +71,19 @@ let ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
 function cargarDatosIniciales() {
     document.getElementById('nombreEstablecimiento').value = nombreEstablecimiento;
     document.getElementById('tasaBCV').value = tasaBCVGuardada || '';
+    actualizarLista();
+}
+
+function guardarNombreEstablecimiento() {
+    const nombre = document.getElementById('nombreEstablecimiento').value.trim();
+    if (!nombre) {
+        mostrarToast("Ingrese un nombre v√°lido para el establecimiento", "error");
+        return;
+    }
+    
+    nombreEstablecimiento = nombre;
+    localStorage.setItem('nombreEstablecimiento', nombreEstablecimiento);
+    mostrarToast("Nombre del establecimiento guardado correctamente");
 }
 
 function calcularPrecioVenta() {
@@ -106,7 +119,7 @@ function guardarProducto() {
     if (!validarCamposNumericos(costo, ganancia, unidadesPorCaja)) return;
 
     if (productoExiste(nombre)) {
-        if (!confirm(`"${nombre}" ya existe. øDeseas actualizarlo?`)) return;
+        if (!confirm(`"${nombre}" ya existe. ¬øDeseas actualizarlo?`)) return;
         const index = productos.findIndex(p => p.nombre.toLowerCase() === nombre.toLowerCase());
         productos.splice(index, 1);
     }
@@ -131,7 +144,7 @@ function generarListaPreciosEmpleados() {
     });
 
     if (esDispositivoMovil()) {
-        if (confirm("øCopiar lista de precios al portapapeles?")) {
+        if (confirm("¬øCopiar lista de precios al portapapeles?")) {
             copiarAlPortapeles(contenido);
         }
     } else {
@@ -207,7 +220,7 @@ function actualizarLista() {
         tbody.appendChild(row);
     });
 
-    // Configurar copiado en mÛviles
+    // Configurar copiado en m√≥viles
     if (esDispositivoMovil()) {
         document.querySelectorAll('#listaProductos td').forEach(td => {
             td.style.cursor = 'pointer';
@@ -234,7 +247,7 @@ function reiniciarCalculadora() {
 
 function validarTasaBCV(tasa) {
     if (isNaN(tasa) || tasa <= 0) {
-        mostrarToast("Ingrese una tasa BCV v·lida (mayor a cero)", "error");
+        mostrarToast("Ingrese una tasa BCV v√°lida (mayor a cero)", "error");
         return false;
     }
     return true;
@@ -242,7 +255,7 @@ function validarTasaBCV(tasa) {
 
 function validarCamposNumericos(costo, ganancia, unidades) {
     if (isNaN(costo) || costo <= 0 || isNaN(ganancia) || ganancia <= 0 || isNaN(unidades) || unidades <= 0) {
-        mostrarToast("Complete todos los campos con valores v·lidos (mayores a cero)", "error");
+        mostrarToast("Complete todos los campos con valores v√°lidos (mayores a cero)", "error");
         return false;
     }
     return true;
@@ -326,7 +339,7 @@ function ajustarInventario(index, operacion) {
     const cantidad = parseInt(prompt(`Ingrese la cantidad a ${operacion === 'sumar' ? 'sumar' : 'restar'}:`, "1")) || 0;
     
     if (cantidad <= 0) {
-        mostrarToast("Ingrese una cantidad v·lida", "error");
+        mostrarToast("Ingrese una cantidad v√°lida", "error");
         return;
     }
 
@@ -386,7 +399,7 @@ function editarProducto(index) {
 
 function eliminarProducto(index) {
     const producto = productos[index];
-    if (confirm(`øEst·s seguro de eliminar "${producto.nombre}"?`)) {
+    if (confirm(`¬øEst√°s seguro de eliminar "${producto.nombre}"?`)) {
         productos.splice(index, 1);
         localStorage.setItem('productos', JSON.stringify(productos));
         actualizarLista();
@@ -445,10 +458,10 @@ function generarReporteDiario() {
         return;
     }
 
-    // Para mÛviles: copiar al portapapeles
+    // Para m√≥viles: copiar al portapapeles
     if (esDispositivoMovil()) {
         const textoReporte = generarTextoReporte(ventasDelDia, fechaReporte);
-        if (confirm("øCopiar el reporte al portapapeles?")) {
+        if (confirm("¬øCopiar el reporte al portapapeles?")) {
             copiarAlPortapeles(textoReporte);
         }
         return;
@@ -469,7 +482,7 @@ function generarReporteDiario() {
         doc.autoTable({
             startY: 30,
             head: [
-                ['Producto', 'DescripciÛn', 'Cantidad', 'P.Unit ($)', 'P.Unit (Bs)', 'Total ($)', 'Total (Bs)']
+                ['Producto', 'Descripci√≥n', 'Cantidad', 'P.Unit ($)', 'P.Unit (Bs)', 'Total ($)', 'Total (Bs)']
             ],
             body: ventasDelDia.map(venta => [
                 venta.producto,
@@ -506,13 +519,13 @@ function generarReporteDiario() {
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
         doc.setFont(undefined, 'bold');
-        doc.text(`Total General en DÛlares: $${totalDolar.toFixed(2)}`, 14, finalY);
-        doc.text(`Total General en BolÌvares: Bs${totalBolivar.toFixed(2)}`, 14, finalY + 10);
+        doc.text(`Total General en D√≥lares: $${totalDolar.toFixed(2)}`, 14, finalY);
+        doc.text(`Total General en Bol√≠vares: Bs${totalBolivar.toFixed(2)}`, 14, finalY + 10);
         doc.text(`Tasa BCV utilizada: ${tasaBCVGuardada}`, 14, finalY + 20);
         
         const nombreArchivo = `ventas_${fechaReporte.replace(/\//g, '-')}.pdf`;
         doc.save(nombreArchivo);
-        mostrarToast(`Reporte del ${fechaReporte} generado con Èxito`);
+        mostrarToast(`Reporte del ${fechaReporte} generado con √©xito`);
         
     } catch (error) {
         mostrarToast("Error al generar reporte: " + error.message, "error");
@@ -532,8 +545,8 @@ function generarTextoReporte(ventas, fecha) {
     const totalDolar = ventas.reduce((sum, venta) => sum + venta.totalDolar, 0);
     const totalBolivar = ventas.reduce((sum, venta) => sum + venta.totalBolivar, 0);
     
-    texto += `\nTOTAL D”LARES: $${totalDolar.toFixed(2)}\n`;
-    texto += `TOTAL BOLÕVARES: Bs${totalBolivar.toFixed(2)}\n`;
+    texto += `\nTOTAL D√ìLARES: $${totalDolar.toFixed(2)}\n`;
+    texto += `TOTAL BOL√çVARES: Bs${totalBolivar.toFixed(2)}\n`;
     texto += `Tasa BCV: ${tasaBCVGuardada}`;
     
     return texto;
@@ -545,10 +558,10 @@ function generarRespaldoCompleto() {
         return;
     }
 
-    // Para mÛviles: generar texto copiable
+    // Para m√≥viles: generar texto copiable
     if (esDispositivoMovil()) {
         const textoRespaldo = generarTextoRespaldo();
-        if (confirm("øCopiar respaldo al portapapeles?")) {
+        if (confirm("¬øCopiar respaldo al portapapeles?")) {
             copiarAlPortapeles(textoRespaldo);
         }
         return;
@@ -740,7 +753,7 @@ function generarPDFCostos() {
     }
 
     if (esDispositivoMovil()) {
-        if (!confirm("Est·s en un dispositivo mÛvil. La generaciÛn de PDF puede fallar. øContinuar?")) {
+        if (!confirm("Est√°s en un dispositivo m√≥vil. La generaci√≥n de PDF puede fallar. ¬øContinuar?")) {
             return;
         }
     }
@@ -756,7 +769,7 @@ function generarPDFCostos() {
         
         const columns = [
             { header: 'Producto', dataKey: 'nombre' },
-            { header: 'DescripciÛn', dataKey: 'descripcion' },
+            { header: 'Descripci√≥n', dataKey: 'descripcion' },
             { header: 'Costo ($)', dataKey: 'costoDolar' },
             { header: 'Costo (Bs)', dataKey: 'costoBolivar' }
         ];
@@ -792,7 +805,7 @@ function generarPDFCostos() {
 }
 
 function limpiarLista() {
-    if (confirm("øEst·s seguro de limpiar toda la lista de productos? Esta acciÛn no se puede deshacer.")) {
+    if (confirm("¬øEst√°s seguro de limpiar toda la lista de productos? Esta acci√≥n no se puede deshacer.")) {
         productos = [];
         localStorage.setItem('productos', JSON.stringify(productos));
         actualizarLista();
@@ -813,11 +826,10 @@ function limpiarVentasAntiguas() {
     }
 }
 
-// ===== INICIALIZACI”N ===== //
+// ===== INICIALIZACI√ìN ===== //
 document.addEventListener('DOMContentLoaded', function() {
     verificarActualizacion();
     cargarDatosIniciales();
-    actualizarLista();
     
     // Configurar eventos de inactividad
     reiniciarTemporizadorInactividad();
@@ -825,6 +837,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener(evento, reiniciarTemporizadorInactividad);
     });
 
-    // Limpiar ventas antiguas autom·ticamente
+    // Limpiar ventas antiguas autom√°ticamente
     limpiarVentasAntiguas();
 });
