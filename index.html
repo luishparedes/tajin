@@ -7,10 +7,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     
-    <title>Calculadora Mágica</title>
+    <title>Calculadora MÃ¡gica</title>
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Librerías JS -->
+    <!-- LibrerÃ­as JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -108,7 +108,7 @@
             margin-bottom: 10px;
         }
         
-        /* Botones flotantes de navegación mejorados */
+        /* Botones flotantes de navegaciÃ³n mejorados */
         .floating-nav {
             position: fixed;
             right: 20px;
@@ -144,17 +144,17 @@
             transform: scale(0.95);
         }
 
-        /* Botón para ir arriba */
+        /* BotÃ³n para ir arriba */
         .go-top {
             background: linear-gradient(to bottom, #4CAF50, #66BB6A) !important;
         }
 
-        /* Botón para ir abajo */
+        /* BotÃ³n para ir abajo */
         .go-bottom {
             background: linear-gradient(to bottom, #607d8b, #78909c) !important;
         }
         
-        /* Nuevos botones añadidos */
+        /* Nuevos botones aÃ±adidos */
         .botones-adicionales {
             margin: 20px 0;
             display: flex;
@@ -195,21 +195,21 @@
     </style>
 </head>
 <body>
-    <div class="copyright-icon" onclick="toggleCopyrightNotice()">©</div>
+    <div class="copyright-icon" onclick="toggleCopyrightNotice()">Â©</div>
     
     <div class="copyright-notice" id="copyrightNotice">
-        <button class="close-btn" onclick="toggleCopyrightNotice()">×</button>
-        <strong>ADVERTENCIA:</strong> Este sistema está protegido por derechos de autor. 
-        <strong>No revendas tu código de acceso</strong> o será bloqueado y perderás tu dinero. 
-        Cualquier uso no autorizado será penalizado según las leyes aplicables.
+        <button class="close-btn" onclick="toggleCopyrightNotice()">Ã—</button>
+        <strong>ADVERTENCIA:</strong> Este sistema estÃ¡ protegido por derechos de autor. 
+        <strong>No revendas tu cÃ³digo de acceso</strong> o serÃ¡ bloqueado y perderÃ¡s tu dinero. 
+        Cualquier uso no autorizado serÃ¡ penalizado segÃºn las leyes aplicables.
     </div>
 
     <div class="calculator">
-        <h2>Calculadora Mágica</h2>
+        <h2>Calculadora MÃ¡gica</h2>
         
         <section>
             <h3>Nombre del Establecimiento</h3>
-            <input type="text" id="nombreEstablecimiento" placeholder="Ej: Tienda La Bendición">
+            <input type="text" id="nombreEstablecimiento" placeholder="Ej: Tienda La BendiciÃ³n">
             <button onclick="guardarNombreEstablecimiento()">Guardar Nombre</button>
         </section>
 
@@ -224,20 +224,20 @@
             <input type="text" id="producto" placeholder="Nombre del producto" required="true">
             <input type="number" id="costo" placeholder="Costo del producto" required="true">
             <select id="descripcion" required="true">
-                <option value="">Selecciona una descripción</option>
-                <option value="viveres">Víveres</option>
+                <option value="">Selecciona una descripciÃ³n</option>
+                <option value="viveres">VÃ­veres</option>
                 <option value="gaseosas">Gaseosas</option>
                 <option value="licores">Licores</option>
                 <option value="enlatados">Enlatados</option>
-                <option value="plasticos">Plásticos</option>
-                <option value="papeleria">Papelería</option>
-                <option value="lacteos">Lácteos</option>
-                <option value="ferreteria">Ferretería</option>
+                <option value="plasticos">PlÃ¡sticos</option>
+                <option value="papeleria">PapelerÃ­a</option>
+                <option value="lacteos">LÃ¡cteos</option>
+                <option value="ferreteria">FerreterÃ­a</option>
                 <option value="agropecuaria">Agropecuaria</option>
-                <option value="frigorifico">Frigorífico</option>
-                <option value="pescaderia">Pescadería</option>
+                <option value="frigorifico">FrigorÃ­fico</option>
+                <option value="pescaderia">PescaderÃ­a</option>
                 <option value="repuesto">Repuesto</option>
-                <option value="confiteria">Confitería</option>
+                <option value="confiteria">ConfiterÃ­a</option>
                 <option value="ropa">Ropa</option>
                 <option value="calzados">Calzados</option>
                 <option value="otros">Otros</option>
@@ -264,7 +264,7 @@
             <thead>
                 <tr>
                     <th>Producto</th>
-                    <th>Descripción</th>
+                    <th>DescripciÃ³n</th>
                     <th>Existencias</th>
                     <th>Ajustar Inventario</th>
                     <th>Precio Unitario ($)</th>
@@ -278,7 +278,6 @@
         <div class="action-buttons">
             <button onclick="generarReporteDiario()" class="generar-pdf">Generar Reporte Diario</button>
             <button onclick="mostrarListaCostos()" class="lista-costos">Mostrar Lista de Costos</button>
-            <button onclick="generarRespaldoCompleto()" class="generar-respaldo">Generar Respaldo Completo</button>
             <button onclick="limpiarLista()" class="limpiar-lista">Limpiar Lista</button>
         </div>
 
@@ -290,25 +289,22 @@
             <ul id="listaCostos"></ul>
         </div>
         
-        <!-- Nuevos botones añadidos -->
+        <!-- Nuevos botones aÃ±adidos -->
         <div class="botones-adicionales">
             <button onclick="generarListaPreciosEmpleados()" class="btn-lista-empleados">
                 <i class="fas fa-clipboard-list"></i> Lista para Empleados
             </button>
-            <button onclick="generarRespaldoCompleto()" class="btn-respaldo">
-                <i class="fas fa-file-export"></i> Respaldo Completo
-            </button>
         </div>
     </div>
 
-    <!-- Botones flotantes de navegación mejorados -->
+    <!-- Botones flotantes de navegaciÃ³n mejorados -->
     <div class="floating-nav">
-        <button class="go-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">?</button>
-        <button class="go-bottom" onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})">?</button>
+        <button class="go-top" onclick="window.scrollTo({top: 0, behavior: 'smooth'})"><i class="fas fa-arrow-up"></i></button>
+        <button class="go-bottom" onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})"><i class="fas fa-arrow-down"></i></button>
     </div>
 
     <script>
-        // Sistema de actualización
+        // Sistema de actualizaciÃ³n
         const APP_VERSION = "1.2.0";
         
         function toggleCopyrightNotice() {
@@ -326,13 +322,13 @@
             
             if (savedVersion !== APP_VERSION) {
                 setTimeout(() => {
-                    mostrarToast(`Versión ${APP_VERSION} cargada`, "success", 3000);
+                    mostrarToast(`VersiÃ³n ${APP_VERSION} cargada`, "success", 3000);
                 }, 2000);
                 localStorage.setItem('appVersion', APP_VERSION);
             }
         }
         
-        // Inicialización
+        // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {
             checkAppVersion();
             
