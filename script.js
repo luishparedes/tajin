@@ -626,6 +626,47 @@ function generarRespaldoCompleto() {
             }
         });
 
+        // Agregar sección de ventas si existen
+        if (ventasDiarias.length > 0) {
+            const fechasVentas = [...new Set(ventasDiarias.map(v => v.fecha))];
+            
+            fechasVentas.forEach(fecha => {
+                const ventasDia = ventasDiarias.filter(v => v.fecha === fecha);
+                const totalDiaDolar = ventasDia.reduce((sum, v) => sum + v.totalDolar, 0);
+                const totalDiaBs = ventasDia.reduce((sum, v) => sum + v.totalBolivar, 0);
+                
+                doc.addPage();
+                doc.setFontSize(14);
+                doc.text(`Ventas del ${fecha}`, 105, 15, { align: 'center' });
+                
+                doc.autoTable({
+                    startY: 25,
+                    head: [
+                        ['Producto', 'Cantidad', 'P.Unit ($)', 'Total ($)', 'Total (Bs)']
+                    ],
+                    body: ventasDia.map(venta => [
+                        venta.producto,
+                        venta.cantidad,
+                        `$${venta.precioUnitarioDolar.toFixed(2)}`,
+                        `$${venta.totalDolar.toFixed(2)}`,
+                        `Bs${venta.totalBolivar.toFixed(2)}`
+                    ]),
+                    styles: configMovil,
+                    headStyles: { 
+                        fillColor: [155, 89, 182],
+                        textColor: 255,
+                        fontSize: 7
+                    }
+                });
+                
+                doc.setFontSize(10);
+                doc.setTextColor(0, 0, 0);
+                doc.setFont(undefined, 'bold');
+                const finalY = doc.autoTable.previous.finalY + 10;
+                doc.text(`Total del día: $${totalDiaDolar.toFixed(2)} / Bs${totalDiaBs.toFixed(2)}`, 14, finalY);
+            });
+        }
+
         doc.save(`respaldo_${new Date().toISOString().slice(0,10)}.pdf`);
         mostrarToast("Respaldo generado en PDF");
         
