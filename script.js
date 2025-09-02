@@ -1,5 +1,5 @@
 // ===== SISTEMA DE ACTUALIZACIÓN AUTOMÁTICA ===== //
-const VERSION_ACTUAL = "1.1.0"; // CAMBIA ESTE NÚMERO CON CADA ACTUALIZACIÓN
+const VERSION_ACTUAL = "1.2.0"; // Versión actualizada con código de barras
 
 // ===== SISTEMA DE REDIRECCIÓN POR INACTIVIDAD ===== //
 const TIEMPO_INACTIVIDAD = 10 * 60 * 1000; // 10 minutos en milisegundos
@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarLista();
     actualizarCarrito();
     verificarActualizacion();
+    configurarScanner();
 });
 
 // ================= NUEVAS FUNCIONES DEL CARRITO =================
@@ -95,24 +96,34 @@ function agregarPorCodigoBarras() {
         return;
     }
     
-    // Buscar producto por nombre (simulando búsqueda por código)
-    // En una implementación real, tendrías un campo de código de barras en cada producto
+    // Buscar producto por código de barras
     const productoEncontrado = productos.find(p => 
-        p.nombre.toLowerCase().includes(codigo.toLowerCase()) || 
-        p.descripcion.toLowerCase().includes(codigo.toLowerCase())
+        p.codigoBarras && p.codigoBarras.toLowerCase() === codigo.toLowerCase()
     );
     
+    // Si no se encuentra por código, buscar por nombre
     if (!productoEncontrado) {
-        mostrarToast("?? Producto no encontrado. ¿Desea agregarlo manualmente?", "warning");
+        mostrarToast("?? Producto no encontrado por código. Buscando por nombre...", "warning");
         
-        // Preguntar si quiere agregar manualmente
-        if (confirm("Producto no encontrado. ¿Desea agregarlo manualmente?")) {
-            document.getElementById('producto').value = codigo;
-            document.getElementById('producto').focus();
-            window.scrollTo(0, 0);
+        const productoPorNombre = productos.find(p => 
+            p.nombre.toLowerCase().includes(codigo.toLowerCase()) || 
+            p.descripcion.toLowerCase().includes(codigo.toLowerCase())
+        );
+        
+        if (productoPorNombre) {
+            productoEncontrado = productoPorNombre;
+        } else {
+            mostrarToast("?? Producto no encontrado. ¿Desea agregarlo manualmente?", "warning");
+            
+            // Preguntar si quiere agregar manualmente
+            if (confirm("Producto no encontrado. ¿Desea agregarlo manualmente?")) {
+                document.getElementById('producto').value = codigo;
+                document.getElementById('producto').focus();
+                window.scrollTo(0, 0);
+            }
+            
+            return;
         }
-        
-        return;
     }
     
     // Verificar si ya está en el carrito
@@ -350,6 +361,7 @@ function calcularPrecioVenta() {
 
 function guardarProducto() {
     const nombre = document.getElementById('producto').value.trim();
+    const codigoBarras = document.getElementById('codigoBarras').value.trim();
     const descripcion = document.getElementById('descripcion').value;
     const costo = parseFloat(document.getElementById('costo').value);
     const ganancia = parseFloat(document.getElementById('ganancia').value);
@@ -367,7 +379,7 @@ function guardarProducto() {
         productos.splice(index, 1);
     }
 
-    const producto = calcularProducto(nombre, descripcion, costo, ganancia, unidadesPorCaja, tasaBCV, unidadesExistentes);
+    const producto = calcularProducto(nombre, codigoBarras, descripcion, costo, ganancia, unidadesPorCaja, tasaBCV, unidadesExistentes);
     guardarProductoEnLista(producto);
 }
 
@@ -435,6 +447,7 @@ function generarPDFCostos() {
         const columns = [
             { header: 'Producto', dataKey: 'nombre' },
             { header: 'Descripción', dataKey: 'descripcion' },
+            { header: 'Código Barras', dataKey: 'codigoBarras' },
             { header: 'Costo ($)', dataKey: 'costoDolar' },
             { header: 'Costo (Bs)', dataKey: 'costoBolivar' }
         ];
@@ -442,6 +455,7 @@ function generarPDFCostos() {
         const rows = productos.map(producto => ({
             nombre: producto.nombre,
             descripcion: producto.descripcion,
+            codigoBarras: producto.codigoBarras || 'N/A',
             costoDolar: `$${producto.costo.toFixed(2)}`,
             costoBolivar: `Bs${(producto.costo * tasaBCVGuardada).toFixed(2)}`
         }));
@@ -521,24 +535,25 @@ function generarRespaldoCompleto() {
         doc.text(`Tasa BCV: ${tasaBCVGuardada} | Productos: ${productos.length}`, 105, 28, { align: 'center' });
 
         // Tabla principal optimizada para móviles
-      
-         const columns = [
-        { header: 'Producto', dataKey: 'nombre' },
-        { header: 'Unid/Caja', dataKey: 'unidades' },
-        { header: 'Costo$', dataKey: 'costo' },
-        { header: 'Gan%', dataKey: 'ganancia' },
-        { header: 'P.Venta$', dataKey: 'pVentaDolar' },
-        { header: 'P.VentaBs', dataKey: 'pVentaBs' }
-    ];
-    
-    const rows = productos.map(producto => ({
-        nombre: producto.nombre,
-        unidades: producto.unidadesPorCaja,
-        costo: `$${producto.costo.toFixed(2)}`,
-        ganancia: `${(producto.ganancia * 100).toFixed(0)}%`,
-        pVentaDolar: `$${producto.precioUnitarioDolar.toFixed(2)}`,
-        pVentaBs: `Bs${producto.precioUnitarioBolivar.toFixed(2)}`
-    }));
+        const columns = [
+            { header: 'Producto', dataKey: 'nombre' },
+            { header: 'Código', dataKey: 'codigo' },
+            { header: 'Unid/Caja', dataKey: 'unidades' },
+            { header: 'Costo$', dataKey: 'costo' },
+            { header: 'Gan%', dataKey: 'ganancia' },
+            { header: 'P.Venta$', dataKey: 'pVentaDolar' },
+            { header: 'P.VentaBs', dataKey: 'pVentaBs' }
+        ];
+        
+        const rows = productos.map(producto => ({
+            nombre: producto.nombre,
+            codigo: producto.codigoBarras || 'N/A',
+            unidades: producto.unidadesPorCaja,
+            costo: `$${producto.costo.toFixed(2)}`,
+            ganancia: `${(producto.ganancia * 100).toFixed(0)}%`,
+            pVentaDolar: `$${producto.precioUnitarioDolar.toFixed(2)}`,
+            pVentaBs: `Bs${producto.precioUnitarioBolivar.toFixed(2)}`
+        }));
 
         doc.autoTable({
             startY: 35,
@@ -551,11 +566,13 @@ function generarRespaldoCompleto() {
                 fontSize: 7
             },
             columnStyles: {
-                0: { cellWidth: 30 },
+                0: { cellWidth: 25 },
                 1: { cellWidth: 20 },
                 2: { cellWidth: 15 },
-                3: { cellWidth: 20 },
-                4: { cellWidth: 25 }
+                3: { cellWidth: 15 },
+                4: { cellWidth: 15 },
+                5: { cellWidth: 20 },
+                6: { cellWidth: 25 }
             }
         });
 
@@ -800,13 +817,14 @@ function generarReporteDiario() {
 
 // ================= FUNCIONES DE CÁLCULO =================
 
-function calcularProducto(nombre, descripcion, costo, ganancia, unidadesPorCaja, tasaBCV, unidadesExistentes = 0) {
+function calcularProducto(nombre, codigoBarras, descripcion, costo, ganancia, unidadesPorCaja, tasaBCV, unidadesExistentes = 0) {
     const gananciaDecimal = ganancia / 100;
     const precioDolar = costo / (1 - gananciaDecimal);
     const precioBolivares = precioDolar * tasaBCV;
 
     return {
         nombre,
+        codigoBarras,
         descripcion,
         costo,
         ganancia: gananciaDecimal,
@@ -844,6 +862,7 @@ function actualizarLista() {
         row.innerHTML = `
             <td>${producto.nombre}</td>
             <td>${producto.descripcion}</td>
+            <td>${producto.codigoBarras || 'N/A'}</td>
             <td class="${inventarioBajo ? 'inventario-bajo' : ''}">${producto.unidadesExistentes}</td>
             <td>
                 <div class="ajuste-inventario">
@@ -857,6 +876,7 @@ function actualizarLista() {
                 <button class="editar" onclick="editarProducto(${originalIndex})">Editar</button>
                 <button class="imprimir" onclick="imprimirTicket(${originalIndex})">Imprimir</button>
                 <button class="eliminar" onclick="eliminarProducto(${originalIndex})">Eliminar</button>
+                <button class="cb-button" onclick="agregarCodigoBarras(${originalIndex})">CB</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -875,6 +895,7 @@ function mostrarResultados(precioUnitarioDolar, precioUnitarioBolivar) {
 
 function reiniciarCalculadora() {
     document.getElementById('producto').value = '';
+    document.getElementById('codigoBarras').value = '';
     document.getElementById('costo').value = '';
     document.getElementById('ganancia').value = '';
     document.getElementById('unidadesPorCaja').value = '';
@@ -935,7 +956,8 @@ function buscarProducto() {
 
     const resultados = productos.filter(p => 
         p.nombre.toLowerCase().includes(termino) || 
-        p.descripcion.toLowerCase().includes(termino)
+        p.descripcion.toLowerCase().includes(termino) ||
+        (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termino))
     );
 
     const tbody = document.querySelector('#listaProductos tbody');
@@ -949,6 +971,7 @@ function buscarProducto() {
         row.innerHTML = `
             <td>${producto.nombre}</td>
             <td>${producto.descripcion}</td>
+            <td>${producto.codigoBarras || 'N/A'}</td>
             <td class="${inventarioBajo ? 'inventario-bajo' : ''}">${producto.unidadesExistentes}</td>
             <td>
                 <div class="ajuste-inventario">
@@ -962,6 +985,7 @@ function buscarProducto() {
                 <button class="editar" onclick="editarProducto(${originalIndex})">Editar</button>
                 <button class="imprimir" onclick="imprimirTicket(${originalIndex})">Imprimir</button>
                 <button class="eliminar" onclick="eliminarProducto(${originalIndex})">Eliminar</button>
+                <button class="cb-button" onclick="agregarCodigoBarras(${originalIndex})">CB</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -974,6 +998,7 @@ function editarProducto(index) {
     const producto = productos[index];
     
     document.getElementById('producto').value = producto.nombre;
+    document.getElementById('codigoBarras').value = producto.codigoBarras || '';
     document.getElementById('descripcion').value = producto.descripcion;
     document.getElementById('costo').value = producto.costo;
     document.getElementById('ganancia').value = producto.ganancia * 100;
@@ -990,6 +1015,19 @@ function editarProducto(index) {
     localStorage.setItem('productos', JSON.stringify(productos));
     
     mostrarToast(`?? Editando producto: ${producto.nombre}`);
+}
+
+function agregarCodigoBarras(index) {
+    const producto = productos[index];
+    const codigoBarras = prompt(`Ingrese el código de barras para ${producto.nombre}:`, producto.codigoBarras || '');
+    
+    if (codigoBarras === null) return; // Usuario canceló
+    
+    producto.codigoBarras = codigoBarras.trim();
+    localStorage.setItem('productos', JSON.stringify(productos));
+    actualizarLista();
+    
+    mostrarToast(`✓ Código de barras actualizado para ${producto.nombre}`);
 }
 
 function eliminarProducto(index) {
@@ -1016,6 +1054,7 @@ function imprimirTicket(index) {
                     .producto { font-weight: bold; font-size: 18px; }
                     .precios { margin-top: 10px; }
                     .fecha { font-size: 12px; text-align: right; margin-top: 15px; }
+                    .codigo-barras { text-align: center; margin: 10px 0; font-family: monospace; }
                 </style>
             </head>
             <body>
@@ -1025,6 +1064,7 @@ function imprimirTicket(index) {
                     </div>
                     <div class="producto">${producto.nombre}</div>
                     <div>${producto.descripcion}</div>
+                    ${producto.codigoBarras ? `<div class="codigo-barras">Código: ${producto.codigoBarras}</div>` : ''}
                     <div class="precios">
                         <div>Precio: $${producto.precioUnitarioDolar.toFixed(2)}</div>
                         <div>Precio: Bs${producto.precioUnitarioBolivar.toFixed(2)}</div>
@@ -1039,7 +1079,7 @@ function imprimirTicket(index) {
 }
 
 // Sistema de actualización
-const APP_VERSION = "1.1.0"; // Versión actualizada
+const APP_VERSION = "1.2.0"; // Versión actualizada con código de barras
 
 function toggleCopyrightNotice() {
     const notice = document.getElementById('copyrightNotice');
@@ -1075,7 +1115,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 15000);
     }, 5000);
-    
-    // Configurar escáner de código de barras
-    configurarScanner();
 });
