@@ -255,6 +255,23 @@
     background: linear-gradient(to right, #43A047, #5CB85C);
 }
 
+/* Estilos para el botón CB (Código de Barras) */
+.cb-button {
+    background: linear-gradient(to right, #9c27b0, #ab47bc);
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 5px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.cb-button:hover {
+    background: linear-gradient(to right, #7b1fa2, #8e24aa);
+}
+
 @media (max-width: 768px) {
     .carrito-header {
         flex-direction: column;
