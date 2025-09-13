@@ -121,12 +121,19 @@
         
         <div class="carrito-header">
             <div class="scanner-input">
-                <input type="text" id="codigoBarrasInput" placeholder="Escanea o ingresa código de barras">
+                <!-- Input y botón (mantenemos el botón 'Agregar Producto') -->
+                <input type="text" id="codigoBarrasInput" placeholder="Escanea o ingresa código de barras o nombre del producto">
                 <button onclick="agregarPorCodigoBarras()">Agregar Producto</button>
+
+                <!-- Lista de sugerencias (aparece como línea delgada gris debajo del input) -->
+                <div id="sugerencias" class="sugerencias-lista" aria-live="polite"></div>
             </div>
+
+            <!-- Estado del escáner, ahora más discreto y ubicado debajo de las sugerencias -->
             <div class="scanner-status" id="scannerStatus">
                 Esperando escaneo de código de barras...
             </div>
+
             <div class="carrito-totales">
                 <div class="carrito-total" id="totalCarritoBs">
                     Total: Bs 0,00
@@ -152,7 +159,7 @@
         </table>
         
         <div class="finalizar-venta">
-            <button class="btn-finalizar" onclick="finalizarVenta()">Finalizar Venta</button>
+           <button id="finalizarVenta" onclick="finalizarVenta()">Finalizar venta</button>
         </div>
     </div>
 
