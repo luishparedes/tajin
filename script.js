@@ -32,6 +32,34 @@ function configurarEventos() {
     });
 }
 
+// ===== BUSCADOR RÁPIDO (para el input del carrito) =====
+document.getElementById('codigoBarrasInput').addEventListener('input', function() {
+    const termino = this.value.trim().toLowerCase();
+    const sugerenciasDiv = document.getElementById('sugerencias');
+    sugerenciasDiv.innerHTML = '';
+
+    if (termino.length < 2) return; // esperar al menos 2 letras para no mostrar demasiadas sugerencias
+
+    const coincidencias = productos.filter(p =>
+        p.nombre.toLowerCase().includes(termino) ||
+        (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termino))
+    );
+
+    coincidencias.forEach(prod => {
+        const opcion = document.createElement('div');
+        opcion.textContent = `${prod.nombre} (${prod.descripcion})`;
+        opcion.onclick = function() {
+            // al seleccionar, colocamos el valor (preferimos el código de barras si existe)
+            document.getElementById('codigoBarrasInput').value = prod.codigoBarras || prod.nombre;
+            agregarPorCodigoBarras(); // agrega directo al carrito
+            sugerenciasDiv.innerHTML = ''; // limpiar lista
+            document.getElementById('codigoBarrasInput').focus();
+        };
+        sugerenciasDiv.appendChild(opcion);
+    });
+});
+
+
 // ===== FUNCIONES BÁSICAS =====
 function cargarDatosIniciales() {
     document.getElementById('nombreEstablecimiento').value = nombreEstablecimiento;
