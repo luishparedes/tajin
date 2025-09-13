@@ -245,25 +245,21 @@
     margin-top: 5px;
 }
 
-.finalizar-venta {
-    margin-top: 20px;
-    display: flex;
-    justify-content: flex-end;
-}
-
-.btn-finalizar {
-    background: linear-gradient(to right, #4CAF50, #66BB6A);
+#finalizarVenta {
+    font-size: 14px;        /* Texto más pequeño */
+    padding: 6px 12px;      /* Botón más compacto */
+    border-radius: 6px;     /* Bordes redondeados */
+    background-color: #28a745; 
     color: white;
-    padding: 12px 25px;
     border: none;
-    border-radius: 8px;
     cursor: pointer;
-    font-size: 1.1rem;
-    font-weight: bold;
+    transition: transform 0.2s ease;
+    width: auto;            /* Se ajusta al texto */
+    display: inline-block;  /* Evita que se estire */
 }
 
-.btn-finalizar:hover {
-    background: linear-gradient(to right, #43A047, #5CB85C);
+#finalizarVenta:hover {
+    transform: scale(1.05);
 }
 
 /* Estilos para el botón CB (Código de Barras) */
@@ -834,4 +830,46 @@ p {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #80cbc4;
+}
+
+/* ===== AÑADIDO: estilos para buscador rápido en carrito ===== */
+.scanner-input {
+    position: relative; /* necesario para posicionar la lista de sugerencias */
+}
+
+/* La idea: parecer una línea delgada gris con sugerencias desplegables */
+.sugerencias-lista {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    width: 100%;
+    max-height: 160px;
+    overflow-y: auto;
+    background: #ffffff;
+    border-top: 1px solid #cfcfcf; /* línea delgada gris arriba */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    z-index: 1200;
+    font-size: 13px;
+    border-radius: 6px;
+    padding: 4px 0;
+}
+
+/* cada opción pequeña para que no ocupe mucho espacio visual */
+.sugerencias-lista div {
+    padding: 6px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sugerencias-lista div:hover {
+    background-color: #f5f5f5;
+}
+
+/* estado del scanner más discreto */
+#scannerStatus {
+    font-size: 12px;
+    color: gray;
+    margin-top: 6px;
 }
