@@ -9,7 +9,7 @@
 
     <title>Calculadora Mágica</title>
 
-    <!-- Librerías JS - Versiones específicas para compatibilidad -->
+    <!-- Librerías JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -18,7 +18,6 @@
 </head>
 <body>
     <div class="copyright-icon" onclick="toggleCopyrightNotice()">©</div>
-
     <div class="copyright-notice" id="copyrightNotice">
         <button class="close-btn" onclick="toggleCopyrightNotice()">×</button>
         <strong>ADVERTENCIA:</strong> Este sistema está protegido por derechos de autor.
@@ -45,7 +44,7 @@
             <h3>Datos del Producto</h3>
             <input type="text" id="producto" placeholder="Nombre del producto" required />
             <input type="text" id="codigoBarras" placeholder="Código de barras (opcional)" />
-            <input type="number" id="costo" placeholder="Costo del producto (en $)" required />
+            <input type="number" id="costo" placeholder="Costo del producto (en $) - por caja/unidad base" required />
             <select id="descripcion" required>
                 <option value="">Selecciona una descripción</option>
                 <option value="viveres">Víveres</option>
@@ -80,42 +79,51 @@
     </div>
 
     <div id="listaProductos">
-        <input type="text" id="buscar" placeholder="Buscar producto" />
-        <button onclick="buscarProducto()">Buscar</button>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th>Descripción</th>
-                    <th>Código Barras</th>
-                    <th>Existencias</th>
-                    <th>Ajustar Inventario</th>
-                    <th>Precio Unitario ($)</th>
-                    <th>Precio Unitario (Bs)</th>
-                    <th>Ganancia (%)</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-
-        <div class="action-buttons">
-            <button onclick="generarReporteDiario()" class="generar-pdf">Generar Reporte Diario</button>
-            <button onclick="mostrarListaCostos()" class="lista-costos">Mostrar Lista de Costos</button>
-            <button onclick="generarRespaldoCompleto()" class="generar-respaldo">PDF LISTA PRODUCTOS</button>
-            <!-- Botón limpiar lista eliminado por solicitud -->
+        <div class="lista-header">
+            <input type="text" id="buscar" placeholder="Buscar producto" />
+            <button onclick="buscarProducto()">Buscar</button>
+            <button id="togglePanelBtn" onclick="togglePanel()">Ocultar/Mostrar Panel</button>
         </div>
 
-        <div id="listaCostosContainer" style="display: none;">
-            <div class="costos-header">
-                <h3>Lista de Costos de Productos</h3>
-                <div>
-                    <input type="text" id="buscarCostos" placeholder="Buscar en lista de costos" style="display:none" oninput="filtrarListaCostos()" />
-                    <button onclick="generarPDFCostos()" class="generar-pdf-costos">Convertir a PDF</button>
-                </div>
+        <div id="panelContenido">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Descripción</th>
+                        <th>Código Barras</th>
+                        <th>Existencias</th>
+                        <th>Ajustar Inventario</th>
+                        <th>Precio Unitario ($)</th>
+                        <th>Precio Unitario (Bs)</th>
+                        <th>Ganancia (%)</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <div class="action-buttons">
+                <button onclick="generarReporteDiario()" class="generar-pdf">Generar Reporte Diario</button>
+                <button onclick="mostrarListaCostos()" class="lista-costos">Mostrar Lista de Costos</button>
+                <button onclick="generarRespaldoCompleto()" class="generar-respaldo">PDF LISTA PRODUCTOS</button>
+                <button onclick="descargarRespaldoLocal()" class="generar-respaldo">DESCARGAR RESPALDO</button>
+                <button onclick="triggerUploadRespaldo()" class="generar-respaldo">SUBIR RESPALDO</button>
+
+                <!-- input file oculto para subir respaldo -->
+                <input type="file" id="inputRespaldo" accept="application/json" style="display:none" onchange="restaurarRespaldo(event)" />
             </div>
-            <ul id="listaCostos"></ul>
+
+            <div id="listaCostosContainer" style="display: none;">
+                <div class="costos-header">
+                    <h3>Lista de Costos de Productos</h3>
+                    <div>
+                        <input type="text" id="buscarCostos" placeholder="Buscar en lista de costos" style="display:none" oninput="filtrarListaCostos()" />
+                        <button onclick="generarPDFCostos()" class="generar-pdf-costos">Convertir a PDF</button>
+                    </div>
+                </div>
+                <ul id="listaCostos"></ul>
+            </div>
         </div>
     </div>
 
@@ -163,6 +171,7 @@
         </div>
     </div>
 
+    <!-- Modal de pago -->
     <div id="modalPago" class="modal">
         <div class="modal-content">
             <span class="close" onclick="cerrarModalPago()">&times;</span>
