@@ -712,31 +712,46 @@ function seleccionarMetodoPago(metodo) {
 }
 
 function confirmarMetodoPago() {
-    if (!metodoPagoSeleccionado) { showToast("Seleccione un método de pago", 'error'); return; }
+    if (!metodoPagoSeleccionado) { 
+        showToast("Seleccione un método de pago", 'error'); 
+        return; 
+    }
 
     const totalBs = carrito.reduce((sum, item) => sum + item.subtotal, 0);
 
     // Validaciones por método
     if (metodoPagoSeleccionado === 'efectivo_bs') {
         const recib = parseFloat(document.getElementById('montoRecibido').value) || 0;
-        if (recib < totalBs) { showToast("Monto recibido menor al total", 'error'); return; }
+        if (recib < totalBs) { 
+            showToast("Monto recibido menor al total", 'error'); 
+            return; 
+        }
         detallesPago.cambio = (recib - totalBs);
         detallesPago.montoRecibido = recib;
     } else if (metodoPagoSeleccionado === 'efectivo_dolares') {
         const recib = parseFloat(document.getElementById('montoRecibido').value) || 0;
         const totalEnDolares = tasaBCVGuardada ? (totalBs / tasaBCVGuardada) : 0;
-        if (recib < totalEnDolares) { showToast("Monto recibido menor al total", 'error'); return; }
+        if (recib < totalEnDolares) { 
+            showToast("Monto recibido menor al total", 'error'); 
+            return; 
+        }
         detallesPago.cambio = (recib - totalEnDolares);
         detallesPago.montoRecibido = recib;
     } else if (metodoPagoSeleccionado === 'punto' || metodoPagoSeleccionado === 'biopago') {
         const monto = parseFloat(document.getElementById('montoPago') ? document.getElementById('montoPago').value : 0) || 0;
-        if (monto <= 0) { showToast("Ingrese el monto para Punto/Biopago", 'error'); return; }
+        if (monto <= 0) { 
+            showToast("Ingrese el monto para Punto/Biopago", 'error'); 
+            return; 
+        }
         detallesPago.monto = monto;
     } else if (metodoPagoSeleccionado === 'pago_movil') {
         const monto = parseFloat(document.getElementById('montoPagoMovil').value) || 0;
         const ref = document.getElementById('refPagoMovil').value.trim();
         const banco = document.getElementById('bancoPagoMovil').value.trim();
-        if (!monto || !ref || !banco) { showToast("Complete todos los datos de Pago Móvil", 'error'); return; }
+        if (!monto || !ref || !banco) { 
+            showToast("Complete todos los datos de Pago Móvil", 'error'); 
+            return; 
+        }
         detallesPago = {...detallesPago, monto, ref, banco };
     }
 
@@ -748,7 +763,13 @@ function confirmarMetodoPago() {
             if (item.unidad === 'gramo') {
                 producto.unidadesExistentes = producto.unidadesExistentes - (item.cantidad / 1000);
             } else {
+                // Para unidades: restamos la cantidad directamente
                 producto.unidadesExistentes = producto.unidadesExistentes - item.cantidad;
+            }
+
+            // Asegurar que no haya números negativos
+            if (producto.unidadesExistentes < 0) {
+                producto.unidadesExistentes = 0;
             }
 
             ventasDiarias.push({
@@ -764,6 +785,7 @@ function confirmarMetodoPago() {
         }
     });
 
+    // ACTUALIZAR LOS DATOS EN LOCALSTORAGE - ESTO ES LO QUE FALTABA
     localStorage.setItem('productos', JSON.stringify(productos));
     localStorage.setItem('ventasDiarias', JSON.stringify(ventasDiarias));
 
@@ -778,6 +800,10 @@ function confirmarMetodoPago() {
     carrito = [];
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
+    
+    // Actualizar la lista de productos para reflejar el nuevo inventario
+    actualizarLista();
+    
     cerrarModalPago();
 
     // Imprimir ticket térmico automáticamente
