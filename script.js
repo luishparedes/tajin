@@ -6,6 +6,7 @@ let ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
 let metodoPagoSeleccionado = null;
 let detallesPago = {}; // guardará info temporal al confirmar el pago
+let productoEditando = null; //
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
@@ -129,30 +130,52 @@ function guardarProducto() {
     const unidadesExistentesInput = parseFloat(document.getElementById('unidadesExistentes').value) || 0;
     const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
 
-    if (!nombre || !descripcion) { showToast("Complete el nombre y descripción del producto", 'error'); return; }
-    if (!tasaBCV || tasaBCV <= 0) { showToast("Ingrese una tasa BCV válida", 'error'); return; }
-    if (!costo || !ganancia || !unidadesPorCaja) { showToast("Complete todos los campos requeridos", 'error'); return; }
+    if (!nombre || !descripcion) { 
+        showToast("Complete el nombre y descripción del producto", 'error'); 
+        return; 
+    }
+    if (!tasaBCV || tasaBCV <= 0) { 
+        showToast("Ingrese una tasa BCV válida", 'error'); 
+        return; 
+    }
+    if (!costo || !ganancia || !unidadesPorCaja) { 
+        showToast("Complete todos los campos requeridos", 'error'); 
+        return; 
+    }
 
-    const productoExistente = productos.findIndex(p => (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase());
-    if (productoExistente !== -1) {
-        if (!confirm(`"${nombre}" ya existe. ¿Deseas actualizarlo?`)) return;
-        productos.splice(productoExistente, 1);
+    // Validar código de barras único (solo si no estamos editando)
+    if (codigoBarras && productoEditando === null) {
+        const codigoExistente = productos.findIndex(p => 
+            p.codigoBarras && p.codigoBarras.toLowerCase() === codigoBarras.toLowerCase()
+        );
+        if (codigoExistente !== -1) {
+            showToast("El código de barras ya existe para otro producto", 'error');
+            return;
+        }
+    }
+
+    // Si estamos editando un producto, mantener su índice original
+    let productoExistenteIndex = -1;
+    if (productoEditando !== null) {
+        productoExistenteIndex = productoEditando;
+    } else {
+        productoExistenteIndex = productos.findIndex(p => 
+            (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase()
+        );
     }
 
     const gananciaDecimal = ganancia / 100;
     const precioDolar = costo / (1 - gananciaDecimal);
     const precioBolivares = precioDolar * tasaBCV;
 
-    // Guardamos existencias en la misma unidad que usas: si agregas 50 -> son 50 kilos (ese es tu formato).
-    // No transformamos aquí a gramos: mantenemos unidadesExistentes tal como lo manejas (kilos).
     const producto = {
         nombre,
         codigoBarras,
         descripcion,
-        costo, // costo en $ (por caja)
+        costo,
         ganancia: gananciaDecimal,
         unidadesPorCaja,
-        unidadesExistentes: unidadesExistentesInput, // en kilos si así lo ingresas
+        unidadesExistentes: unidadesExistentesInput,
         precioMayorDolar: precioDolar,
         precioMayorBolivar: precioBolivares,
         precioUnitarioDolar: precioDolar / unidadesPorCaja,
@@ -160,7 +183,16 @@ function guardarProducto() {
         fechaActualizacion: new Date().toISOString()
     };
 
-    productos.push(producto);
+    if (productoExistenteIndex !== -1) {
+        // Actualizar producto existente
+        productos[productoExistenteIndex] = producto;
+        showToast("✓ Producto actualizado exitosamente", 'success');
+    } else {
+        // Agregar nuevo producto
+        productos.push(producto);
+        showToast("✓ Producto guardado exitosamente", 'success');
+    }
+
     localStorage.setItem('productos', JSON.stringify(productos));
     actualizarLista();
 
@@ -172,8 +204,38 @@ function guardarProducto() {
     document.getElementById('unidadesPorCaja').value = '';
     document.getElementById('unidadesExistentes').value = '';
     document.getElementById('descripcion').selectedIndex = 0;
+    document.getElementById('precioUnitario').innerHTML = '';
 
-    showToast("✓ Producto guardado exitosamente", 'success');
+    // Resetear variable de edición
+    productoEditando = null;
+}
+
+function editarProducto(index) {
+    const producto = productos[index];
+    if (!producto) return;
+
+    // Llenar formulario con datos del producto
+    document.getElementById('producto').value = producto.nombre || '';
+    document.getElementById('codigoBarras').value = producto.codigoBarras || '';
+    document.getElementById('descripcion').value = producto.descripcion || '';
+    document.getElementById('costo').value = producto.costo || '';
+    document.getElementById('ganancia').value = (producto.ganancia * 100) || '';
+    document.getElementById('unidadesPorCaja').value = producto.unidadesPorCaja || '';
+    document.getElementById('unidadesExistentes').value = producto.unidadesExistentes || '';
+    
+    // Calcular y mostrar precio unitario
+    const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
+    if (tasaBCV > 0) {
+        const precioUnitarioDolar = producto.precioUnitarioDolar;
+        const precioUnitarioBolivar = precioUnitarioDolar * tasaBCV;
+        document.getElementById('precioUnitario').innerHTML =
+            `<strong>Precio unitario:</strong> $${precioUnitarioDolar.toFixed(2)} / Bs${precioUnitarioBolivar.toFixed(2)}`;
+    }
+
+    // Establecer modo edición
+    productoEditando = index;
+    
+    showToast(`Editando: ${producto.nombre}`, 'success');
 }
 
 // ===== CARRITO DE VENTAS =====
@@ -478,28 +540,83 @@ function ajustarInventario(index, operacion) {
     showToast(`Inventario de ${producto.nombre} actualizado: ${producto.unidadesExistentes} unidades`, 'success');
 }
 
-function editarProducto(index) {
-    const producto = productos[index];
-    document.getElementById('producto').value = producto.nombre;
-    document.getElementById('codigoBarras').value = producto.codigoBarras || '';
-    document.getElementById('descripcion').value = producto.descripcion;
-    document.getElementById('costo').value = producto.costo;
-    document.getElementById('ganancia').value = producto.ganancia * 100;
-    document.getElementById('unidadesPorCaja').value = producto.unidadesPorCaja;
-    document.getElementById('unidadesExistentes').value = producto.unidadesExistentes;
+// ===== GUARDAR / EDITAR PRODUCTOS =====
+        function guardarProducto() {
+            const nombre = document.getElementById('producto').value.trim();
+            const codigoBarras = document.getElementById('codigoBarras').value.trim();
+            const descripcion = document.getElementById('descripcion').value;
+            const costo = parseFloat(document.getElementById('costo').value);
+            const ganancia = parseFloat(document.getElementById('ganancia').value);
+            const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
+            const unidadesExistentesInput = parseFloat(document.getElementById('unidadesExistentes').value) || 0;
+            const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
 
-    const precioUnitarioDolar = producto.precioUnitarioDolar;
-    const precioUnitarioBolivar = producto.precioUnitarioBolivar;
-    document.getElementById('precioUnitario').innerHTML =
-        `<strong>Precio unitario:</strong> $${precioUnitarioDolar.toFixed(2)} / Bs${precioUnitarioBolivar.toFixed(2)}`;
+            if (!nombre || !descripcion) { 
+                showToast("Complete el nombre y descripción del producto", 'error'); 
+                return; 
+            }
+            if (!tasaBCV || tasaBCV <= 0) { 
+                showToast("Ingrese una tasa BCV válida", 'error'); 
+                return; 
+            }
+            if (!costo || !ganancia || !unidadesPorCaja) { 
+                showToast("Complete todos los campos requeridos", 'error'); 
+                return; 
+            }
 
-    // Eliminar producto actual para reemplazarlo al guardar
-    productos.splice(index, 1);
-    localStorage.setItem('productos', JSON.stringify(productos));
-    actualizarLista();
+            // Si estamos editando un producto, mantener su índice original
+            let productoExistenteIndex = -1;
+            if (productoEditando !== null) {
+                productoExistenteIndex = productoEditando;
+            } else {
+                productoExistenteIndex = productos.findIndex(p => (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase());
+            }
 
-    showToast(`Editando producto: ${producto.nombre}`, 'warning');
-}
+            const gananciaDecimal = ganancia / 100;
+            const precioDolar = costo / (1 - gananciaDecimal);
+            const precioBolivares = precioDolar * tasaBCV;
+
+            const producto = {
+                nombre,
+                codigoBarras,
+                descripcion,
+                costo,
+                ganancia: gananciaDecimal,
+                unidadesPorCaja,
+                unidadesExistentes: unidadesExistentesInput,
+                precioMayorDolar: precioDolar,
+                precioMayorBolivar: precioBolivares,
+                precioUnitarioDolar: precioDolar / unidadesPorCaja,
+                precioUnitarioBolivar: precioBolivares / unidadesPorCaja,
+                fechaActualizacion: new Date().toISOString()
+            };
+
+            if (productoExistenteIndex !== -1) {
+                // Actualizar producto existente
+                productos[productoExistenteIndex] = producto;
+                showToast("✓ Producto actualizado exitosamente", 'success');
+            } else {
+                // Agregar nuevo producto
+                productos.push(producto);
+                showToast("✓ Producto guardado exitosamente", 'success');
+            }
+
+            localStorage.setItem('productos', JSON.stringify(productos));
+            actualizarLista();
+
+            // Reiniciar formulario
+            document.getElementById('producto').value = '';
+            document.getElementById('codigoBarras').value = '';
+            document.getElementById('costo').value = '';
+            document.getElementById('ganancia').value = '';
+            document.getElementById('unidadesPorCaja').value = '';
+            document.getElementById('unidadesExistentes').value = '';
+            document.getElementById('descripcion').selectedIndex = 0;
+            document.getElementById('precioUnitario').innerHTML = '';
+
+            // Resetear variable de edición
+            productoEditando = null;
+        }
 
 function eliminarProducto(index) {
     const producto = productos[index];
