@@ -4,16 +4,16 @@ let nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
 let tasaBCVGuardada = parseFloat(localStorage.getItem('tasaBCV')) || 0;
 let ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
-let métodoPagoSeleccionado = null;
-let detallesPago = {}; // guardará información temporal al confirmar el pago
-deje que productoEditando = null;
+let metodoPagoSeleccionado = null;
+let detallesPago = {}; // guardará info temporal al confirmar el pago
+let productoEditando = null;
 let productosFiltrados = []; // Array para almacenar resultados de búsqueda
 
 // ===== SISTEMA DE REDIRECCIÓN POR INACTIVIDAD ===== //
-const TIEMPO_INACTIVIDAD = 10*60*1000; // 10 minutos en milisegundos
+const TIEMPO_INACTIVIDAD = 10 * 60 * 1000; // 10 minutos en milisegundos
 const URL_REDIRECCION = "http://portal.calculadoramagica.lat/";
 
-dejar temporizadorInactividad;
+let temporizadorInactividad;
 
 function reiniciarTemporizador() {
     // Limpiar el temporizador existente
@@ -22,7 +22,7 @@ function reiniciarTemporizador() {
     // Iniciar nuevo temporizador
     temporizadorInactividad = setTimeout(() => {
         // Redirigir después del tiempo de inactividad
-        ventana.ubicacion.href = URL_REDIRECCION;
+        window.location.href = URL_REDIRECCION;
     }, TIEMPO_INACTIVIDAD);
 }
 
@@ -36,12 +36,12 @@ reiniciarTemporizador();
 
 // ===== FUNCIÓN PARA REDONDEAR A 2 DECIMALES =====
 function redondear2Decimales(numero) {
-    si (isNaN(numero)) devuelve 0;
-    devuelve Math.round((numero + Número.EPSILON) * 100) / 100;
+    if (isNaN(numero)) return 0;
+    return Math.round((numero + Number.EPSILON) * 100) / 100;
 }
 
 // ===== INICIALIZACIÓN =====
-documento.addEventListener('DOMContentLoaded', función() {
+document.addEventListener('DOMContentLoaded', function() {
     console.log('Calculadora iniciada correctamente');
     cargarDatosIniciales();
     actualizarLista();
@@ -49,37 +49,37 @@ documento.addEventListener('DOMContentLoaded', función() {
     configurarEventos();
 });
 
-// ===== UTILIDADES / TOSTADAS =====
-función showToast(mensaje, tipo = 'éxito', duración = 3500) {
-    constante contenedor = document.getElementById('toastContainer');
-    si (!contenedor) regresa; // por si no existe el contenedor
-    constante toast = document.createElement('div');
-    toast.className = `toast ${tipo === 'éxito' ? 'éxito' : tipo === 'error' ? 'error' : 'advertencia'}`;
-    toast.textContent = mensaje;
-    contenedor.appendChild(tostada);
-    establecerTiempo de espera(() => {
+// ===== UTILIDADES / TOASTS =====
+function showToast(message, type = 'success', duration = 3500) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return; // por si no existe el contenedor
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'success' ? 'success' : type === 'error' ? 'error' : 'warning'}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
         toast.style.opacity = '0';
-        toast.style.transform = 'traducirY(8px)';
-        establecerTiempo de espera(() => {
-            si (contenedor.contiene(tostada)) contenedor.eliminarHijo(tostada);
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => {
+            if (container.contains(toast)) container.removeChild(toast);
         }, 300);
-    }, duración);
+    }, duration);
 }
 
 // ===== CONFIGURACIÓN DE EVENTOS =====
-función configurarEventos() {
-    // Búsqueda entrar
+function configurarEventos() {
+    // Búsqueda enter
     const buscarInput = document.getElementById('buscar');
-    si (buscarInput) {
-        buscarInput.addEventListener('pulsación de tecla', función(e) {
+    if (buscarInput) {
+        buscarInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') buscarProducto();
         });
     }
 
-    // Escáner entrar
+    // Scanner enter
     const codigoInput = document.getElementById('codigoBarrasInput');
-    si (codigoInput) {
-        codigoInput.addEventListener('pulsación de tecla', función(e) {
+    if (codigoInput) {
+        codigoInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') agregarPorCodigoBarras();
         });
     }
@@ -87,14 +87,14 @@ función configurarEventos() {
 
 // ===== BUSCADOR RÁPIDO (input del carrito con sugerencias) =====
 const codigoInputElem = document.getElementById('codigoBarrasInput');
-si (codigoInputElem) {
-    codigoInputElem.addEventListener('entrada', función() {
+if (codigoInputElem) {
+    codigoInputElem.addEventListener('input', function() {
         const termino = this.value.trim().toLowerCase();
         const sugerenciasDiv = document.getElementById('sugerencias');
-        si (!sugerenciasDiv) retorna;
+        if (!sugerenciasDiv) return;
         sugerenciasDiv.innerHTML = '';
 
-        si (termino.length < 2) retorna;
+        if (termino.length < 2) return;
 
         const coincidencias = productos.filter(p =>
             (p.nombre || p.producto || '').toLowerCase().includes(termino) ||
@@ -104,13 +104,13 @@ si (codigoInputElem) {
         coincidencias.slice(0, 8).forEach(prod => {
             const opcion = document.createElement('div');
             opcion.textContent = `${(prod.nombre || prod.producto)} (${prod.descripcion || prod.descripcion})`;
-            opcion.onclick = función() {
+            opcion.onclick = function() {
                 document.getElementById('codigoBarrasInput').value = prod.codigoBarras || prod.nombre || prod.producto;
                 agregarPorCodigoBarras();
                 sugerenciasDiv.innerHTML = '';
-                documento.getElementById('codigoBarrasInput').focus();
+                document.getElementById('codigoBarrasInput').focus();
             };
-            sugerenciasDiv.appendChild(opción);
+            sugerenciasDiv.appendChild(opcion);
         });
     });
 }
@@ -123,19 +123,19 @@ function cargarDatosIniciales() {
     if (tasaElem) tasaElem.value = tasaBCVGuardada || '';
 }
 
-función calcularPrecioVenta() {
+function calcularPrecioVenta() {
     const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
     const costo = parseFloat(document.getElementById('costo').value);
     const ganancia = parseFloat(document.getElementById('ganancia').value);
     const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
 
-    si (!tasaBCV || tasaBCV <= 0) {
+    if (!tasaBCV || tasaBCV <= 0) {
         showToast("Ingrese una tasa BCV válida", 'error');
-        devolver;
+        return;
     }
     if (!costo || !ganancia || !unidadesPorCaja) {
         showToast("Complete todos los campos requeridos", 'error');
-        devolver;
+        return;
     }
 
     const gananciaDecimal = ganancia / 100;
@@ -145,53 +145,53 @@ función calcularPrecioVenta() {
     const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
 
     const precioUnitarioElem = document.getElementById('precioUnitario');
-    si (precioUnitarioElem) {
+    if (precioUnitarioElem) {
         precioUnitarioElem.innerHTML =
             `<strong>Precio unitario:</strong> $${precioUnitarioDolar.toFixed(2)} / Bs${precioUnitarioBolivar.toFixed(2)}`;
     }
 }
 
 // ===== GUARDAR / EDITAR PRODUCTOS =====
-función guardarProducto() {
+function guardarProducto() {
     const nombre = document.getElementById('producto').value.trim();
     const codigoBarras = document.getElementById('codigoBarras').value.trim();
-    const descripción = document.getElementById('descripcion').value;
+    const descripcion = document.getElementById('descripcion').value;
     const costo = parseFloat(document.getElementById('costo').value);
     const ganancia = parseFloat(document.getElementById('ganancia').value);
     const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
     const unidadesExistentesInput = parseFloat(document.getElementById('unidadesExistentes').value) || 0;
     const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
 
-    if (!nombre || !descripcion) {
-        showToast("Complete el nombre y descripción del producto", 'error');
-        devolver;
+    if (!nombre || !descripcion) { 
+        showToast("Complete el nombre y descripción del producto", 'error'); 
+        return; 
     }
-    si (!tasaBCV || tasaBCV <= 0) {
-        showToast("Ingrese una tasa BCV válida", 'error');
-        devolver;
+    if (!tasaBCV || tasaBCV <= 0) { 
+        showToast("Ingrese una tasa BCV válida", 'error'); 
+        return; 
     }
-    if (!costo || !ganancia || !unidadesPorCaja) {
-        showToast("Complete todos los campos requeridos", 'error');
-        devolver;
+    if (!costo || !ganancia || !unidadesPorCaja) { 
+        showToast("Complete todos los campos requeridos", 'error'); 
+        return; 
     }
 
     // Validar código de barras único (solo si no estamos editando)
     if (codigoBarras && productoEditando === null) {
-        const codigoExistente = productos.findIndex(p =>
+        const codigoExistente = productos.findIndex(p => 
             p.codigoBarras && p.codigoBarras.toLowerCase() === codigoBarras.toLowerCase()
         );
-        si (codigoExistente !== -1) {
+        if (codigoExistente !== -1) {
             showToast("El código de barras ya existe para otro producto", 'error');
-            devolver;
+            return;
         }
     }
 
-    // Si estamos editando un producto, manteniendo su índice original
+    // Si estamos editando un producto, mantener su índice original
     let productoExistenteIndex = -1;
-    si (productoEditando !== null) {
+    if (productoEditando !== null) {
         productoExistenteIndex = productoEditando;
-    } demás {
-        productoExistenteIndex = productos.findIndex(p =>
+    } else {
+        productoExistenteIndex = productos.findIndex(p => 
             (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase()
         );
     }
@@ -202,10 +202,10 @@ función guardarProducto() {
     const precioUnitarioDolar = redondear2Decimales(precioDolar / unidadesPorCaja);
     const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
 
-    constante producto = {
+    const producto = {
         nombre,
-        códigoBarras,
-        descripción,
+        codigoBarras,
+        descripcion,
         costo,
         ganancia: gananciaDecimal,
         unidadesPorCaja,
@@ -214,59 +214,59 @@ función guardarProducto() {
         precioMayorBolivar: precioBolivares,
         precioUnitarioDolar: precioUnitarioDolar,
         precioUnitarioBolivar: precioUnitarioBolivar,
-        fechaActualización: new Date().toISOString()
+        fechaActualizacion: new Date().toISOString()
     };
 
     if (productoExistenteIndex !== -1) {
         // Actualizar producto existente
         productos[productoExistenteIndex] = producto;
-        showToast(" ✓ Producto actualizado exitosamente", 'success');
-    } demás {
+        showToast("✓ Producto actualizado exitosamente", 'success');
+    } else {
         // Agregar nuevo producto
         productos.push(producto);
-        showToast(" ✓ Producto guardado exitosamente", 'success');
+        showToast("✓ Producto guardado exitosamente", 'success');
     }
 
     localStorage.setItem('productos', JSON.stringify(productos));
     actualizarLista();
 
     // Reiniciar formulario
-    documento.getElementById('producto').value = '';
-    documento.getElementById('codigoBarras').value = '';
-    documento.getElementById('costo').value = '';
+    document.getElementById('producto').value = '';
+    document.getElementById('codigoBarras').value = '';
+    document.getElementById('costo').value = '';
     document.getElementById('ganancia').value = '';
     document.getElementById('unidadesPorCaja').value = '';
     document.getElementById('unidadesExistentes').value = '';
-    documento.getElementById('descripcion').selectedIndex = 0;
+    document.getElementById('descripcion').selectedIndex = 0;
     document.getElementById('precioUnitario').innerHTML = '';
 
-    //Resetear variable de edición
+    // Resetear variable de edición
     productoEditando = null;
 }
 
-función editarProducto(índice) {
-    // Si hay productos filtrados, obtenga el índice real en el array original
-    deje que indiceReal = índice;
+function editarProducto(index) {
+    // Si hay productos filtrados, obtener el índice real en el array original
+    let indiceReal = index;
     
-    si (productosFiltrados.length > 0) {
+    if (productosFiltrados.length > 0) {
         // Buscar el producto en la lista filtrada y obtener el producto real
-        const productoFiltrado = productosFiltrados[índice];
-        si (!productoFiltrado) retorna;
+        const productoFiltrado = productosFiltrados[index];
+        if (!productoFiltrado) return;
         
         // Encontrar el índice real en el array original
-        indiceReal = productos.findIndex(p =>
-            p.nombre === productoFiltrado.nombre &&
+        indiceReal = productos.findIndex(p => 
+            p.nombre === productoFiltrado.nombre && 
             p.descripcion === productoFiltrado.descripcion
         );
         
-        si (índiceReal === -1) {
+        if (indiceReal === -1) {
             showToast("Error: Producto no encontrado en la lista principal", 'error');
-            devolver;
+            return;
         }
     }
     
     const producto = productos[indiceReal];
-    si (!producto) retorna;
+    if (!producto) return;
 
     // Llenar formulario con datos del producto
     document.getElementById('producto').value = producto.nombre || '';
@@ -279,7 +279,7 @@ función editarProducto(índice) {
     
     // Calcular y mostrar precio unitario
     const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
-    si (tasaBCV > 0) {
+    if (tasaBCV > 0) {
         const precioUnitarioDolar = producto.precioUnitarioDolar;
         const precioUnitarioBolivar = precioUnitarioDolar * tasaBCV;
         document.getElementById('precioUnitario').innerHTML =
@@ -289,40 +289,40 @@ función editarProducto(índice) {
     // Establecer modo edición
     productoEditando = indiceReal;
     
-    showToast(`Editando: ${producto.nombre}`, 'éxito');
+    showToast(`Editando: ${producto.nombre}`, 'success');
 }
 
 // ===== CARRITO DE VENTAS =====
 function agregarPorCodigoBarras() {
     const codigo = document.getElementById('codigoBarrasInput').value.trim();
-    if (!codigo) { showToast("Ingrese o escanee un código de barras", 'warning'); devolver; }
+    if (!codigo) { showToast("Ingrese o escanee un código de barras", 'warning'); return; }
 
     // Buscar por código exacto primero
     let productoEncontrado = productos.find(p =>
         p.codigoBarras && p.codigoBarras.toLowerCase() === codigo.toLowerCase()
     );
 
-    // Buscar por nombre si no se encuentra por código
-    si (!productoEncontrado) {
+    // Buscar por nombre si no encontrado por código
+    if (!productoEncontrado) {
         productoEncontrado = productos.find(p =>
             (p.nombre || '').toLowerCase().includes(codigo.toLowerCase()) ||
             (p.producto || '').toLowerCase().includes(codigo.toLowerCase())
         );
-        si (!productoEncontrado) {
+        if (!productoEncontrado) {
             showToast("Producto no encontrado", 'error');
-            devolver;
+            return;
         }
     }
 
     // Verificar si ya está en el carrito (mismo nombre y unidad 'unidad')
     const enCarrito = carrito.findIndex(item => item.nombre === productoEncontrado.nombre && item.unidad === 'unidad');
 
-    si (enCarrito !== -1) {
+    if (enCarrito !== -1) {
         // Actualizar cantidad (unidad)
         carrito[enCarrito].cantidad += 1;
         carrito[enCarrito].subtotal = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioBolivar);
         carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioDolar);
-    } demás {
+    } else {
         // Agregar nuevo producto (por defecto unidad)
         carrito.push({
             nombre: productoEncontrado.nombre,
@@ -337,48 +337,48 @@ function agregarPorCodigoBarras() {
         });
     }
 
-    documento.getElementById('codigoBarrasInput').value = '';
-    documento.getElementById('codigoBarrasInput').focus();
-    constante scannerStatus = document.getElementById('scannerStatus');
+    document.getElementById('codigoBarrasInput').value = '';
+    document.getElementById('codigoBarrasInput').focus();
+    const scannerStatus = document.getElementById('scannerStatus');
     if (scannerStatus) scannerStatus.textContent = 'Producto agregado. Esperando nuevo escaneo...';
 
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
 }
 
-función actualizarCarrito() {
+function actualizarCarrito() {
     const carritoBody = document.getElementById('carritoBody');
     const totalCarritoBs = document.getElementById('totalCarritoBs');
     const totalCarritoDolares = document.getElementById('totalCarritoDolares');
 
-    si (!carritoBody) retorna;
+    if (!carritoBody) return;
 
     carritoBody.innerHTML = '';
 
-    si (carrito.length === 0) {
+    if (carrito.length === 0) {
         carritoBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">El carrito está vacío</td></tr>';
-        si (totalCarritoBs) totalCarritoBs.textContent = 'Total: Bs 0,00';
-        si (totalCarritoDolares) totalCarritoDolares.textContent = 'Total: $ 0,00';
-        devolver;
+        if (totalCarritoBs) totalCarritoBs.textContent = 'Total: Bs 0,00';
+        if (totalCarritoDolares) totalCarritoDolares.textContent = 'Total: $ 0,00';
+        return;
     }
 
-    sea ​​totalBs = 0;
-    sea ​​totalDolares = 0;
+    let totalBs = 0;
+    let totalDolares = 0;
 
     carrito.forEach((item, index) => {
-        totalBs += articulo.subtotal;
+        totalBs += item.subtotal;
         totalDolares += item.subtotalDolar;
 
         // Si la unidad es 'gramo', mostramos la cantidad seguida de "g"
         const cantidadMostrada = item.unidad === 'gramo' ? `${item.cantidad} g` : item.cantidad;
 
-        // Si unidad = 'gramo', el botón + abrirá un mensaje para ingresar gramos (ingresarGramos)
+        // Si unidad = 'gramo', el botón + abrirá un prompt para ingresar gramos (ingresarGramos)
         const botonMas = item.unidad === 'gramo'
             ? `<button onclick="ingresarGramos(${index})">+</button>`
             : `<button onclick="actualizarCantidadCarrito(${index}, 1)">+</button>`;
 
-        constante fila = document.createElement('tr');
-        fila.innerHTML = `
+        const row = document.createElement('tr');
+        row.innerHTML = `
             <td>${item.nombre} (${item.descripcion})</td>
             <td>Bs ${item.precioUnitarioBolivar.toFixed(2)}</td>
             <td>
@@ -388,32 +388,32 @@ función actualizarCarrito() {
             </td>
             <td>
                 <select onchange="cambiarUnidadCarrito(${index}, this.value)" class="unidad-selector">
-                    <option value="unidad" ${item.unidad === 'unidad' ? 'seleccionado' : ''}>Unidad</option>
-                    <opción valor="gramo" ${item.unidad === 'gramo' ? 'seleccionado' : ''}>Gramo</option>
-                </seleccionar>
+                    <option value="unidad" ${item.unidad === 'unidad' ? 'selected' : ''}>Unidad</option>
+                    <option value="gramo" ${item.unidad === 'gramo' ? 'selected' : ''}>Gramo</option>
+                </select>
             </td>
             <td>Bs ${item.subtotal.toFixed(2)}</td>
             <td>
                 <button class="btn-eliminar-carrito" onclick="eliminarDelCarrito(${index})">Eliminar</button>
             </td>
         `;
-        carritoBody.appendChild(fila);
+        carritoBody.appendChild(row);
     });
 
-    si (totalCarritoBs) totalCarritoBs.textContent = `Total: Bs ${redondear2Decimales(totalBs).toFixed(2)}`;
+    if (totalCarritoBs) totalCarritoBs.textContent = `Total: Bs ${redondear2Decimales(totalBs).toFixed(2)}`;
     if (totalCarritoDolares) totalCarritoDolares.textContent = `Total: $ ${redondear2Decimales(totalDolares).toFixed(2)}`;
 }
 
 function actualizarCantidadCarrito(index, cambio) {
-    const item = carrito[índice];
-    si (!item) retorna;
+    const item = carrito[index];
+    if (!item) return;
 
     // Para gramos, el cambio se interpreta como gramos (ej: -1 resta 1 gr)
     item.cantidad += cambio;
 
-    si (item.cantidad <= 0) {
-        eliminarDelCarrito(índice);
-        devolver;
+    if (item.cantidad <= 0) {
+        eliminarDelCarrito(index);
+        return;
     }
 
     // Recalcular subtotal según unidad
@@ -424,47 +424,47 @@ function actualizarCantidadCarrito(index, cambio) {
 }
 
 // ===== FUNCIÓN: ingresarGramos =====
-función ingresarGramos(índice) {
-    const item = carrito[índice];
-    si (!item) retorna;
+function ingresarGramos(index) {
+    const item = carrito[index];
+    if (!item) return;
 
     const producto = productos[item.indexProducto];
-    si (!producto) {
+    if (!producto) {
         showToast("Producto no encontrado en inventario", 'error');
-        devolver;
+        return;
     }
 
-    const entrada = Prompt("Ingrese la cantidad en gramos (ej: 350):", item.cantidad || '');
-    if (entrada === nulo) return; // el usuario canceló
+    const entrada = prompt("Ingrese la cantidad en gramos (ej: 350):", item.cantidad || '');
+    if (entrada === null) return; // el usuario canceló
 
     const gramos = parseFloat(entrada);
     if (isNaN(gramos) || gramos <= 0) {
         showToast("Ingrese una cantidad válida en gramos", 'error');
-        devolver;
+        return;
     }
 
-    // Validación simple de stock: producto.unidadesExistentes están en kilos según tu esquema,
+    // Validación simple de stock: producto.unidadesExistentes está en kilos según tu esquema,
     // por eso convertimos a gramos para comparar.
     const disponibleGramos = (producto.unidadesExistentes || 0) * 1000;
 
     // (Opcional) sumar lo que ya hay en carrito de este producto (excluyendo el ítem actual) para evitar sobreventa
     let enCarritoMismoProducto = 0;
     carrito.forEach((it, i) => {
-        si (i !== índice && it.indexProducto === artículo.indexProducto) {
+        if (i !== index && it.indexProducto === item.indexProducto) {
             if (it.unidad === 'gramo') enCarritoMismoProducto += (parseFloat(it.cantidad) || 0);
-            demás {
+            else {
                 // si está en unidades, convertimos esa unidad a gramos:
                 // suponemos que producto.unidadesPorCaja indica cómo convertir; si no aplica, será 0
                 // Para productos por kilos normalmente unidadesPorCaja = 1 -> 1 unidad = 1000 g.
-                factor constante = producto.unidadesPorCaja || 1;
+                const factor = producto.unidadesPorCaja || 1;
                 enCarritoMismoProducto += (parseFloat(it.cantidad) || 0) * factor * 1000;
             }
         }
     });
 
     if ((gramos + enCarritoMismoProducto) > disponibleGramos) {
-        showToast("No hay suficientes stock (gramos) para esa cantidad", 'error');
-        devolver;
+        showToast("No hay suficiente stock (gramos) para esa cantidad", 'error');
+        return;
     }
 
     // Guardar cantidad en gramos y recalcular subtotal
@@ -476,15 +476,15 @@ función ingresarGramos(índice) {
     actualizarCarrito();
 }
 
-función calcularSubtotalSegonUnidad(item) {
+function calcularSubtotalSegonUnidad(item) {
     const producto = productos[item.indexProducto];
-    si (!producto) retorna;
+    if (!producto) return;
 
     if (item.unidad === 'gramo') {
         // cantidad está en gramos, se multiplica por 0.001 para kilos
         item.subtotal = redondear2Decimales(item.cantidad * item.precioUnitarioBolivar * 0.001);
         item.subtotalDolar = redondear2Decimales(item.cantidad * item.precioUnitarioDolar * 0.001);
-    } demás {
+    } else {
         // unidad
         item.subtotal = redondear2Decimales(item.cantidad * item.precioUnitarioBolivar);
         item.subtotalDolar = redondear2Decimales(item.cantidad * item.precioUnitarioDolar);
@@ -494,21 +494,21 @@ función calcularSubtotalSegonUnidad(item) {
 function cambiarUnidadCarrito(index, nuevaUnidad) {
     carrito[index].unidad = nuevaUnidad;
     // Mantener la cantidad tal cual; el usuario puede usar el + para ingresar gramos si selecciona "gramo".
-    calcularSubtotalSegonUnidad(carrito[índice]);
+    calcularSubtotalSegonUnidad(carrito[index]);
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
 }
 
-función eliminarDelCarrito(índice) {
-    carrito.splice(índice, 1);
+function eliminarDelCarrito(index) {
+    carrito.splice(index, 1);
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
 }
 
 // ===== LISTA DE PRODUCTOS =====
-función actualizarLista() {
+function actualizarLista() {
     const tbody = document.querySelector('#listaProductos tbody');
-    si (!tbody) retorna;
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     productosFiltrados = []; // Reiniciar array de productos filtrados
@@ -540,12 +540,12 @@ función actualizarLista() {
     });
 }
 
-función buscarProducto() {
+function buscarProducto() {
     const termino = document.getElementById('buscar').value.trim().toLowerCase();
-    si (!término) {
+    if (!termino) { 
         productosFiltrados = []; // Limpiar array de productos filtrados
-        actualizarLista();
-        devolver;
+        actualizarLista(); 
+        return; 
     }
 
     productosFiltrados = productos.filter(p =>
@@ -559,8 +559,8 @@ función buscarProducto() {
 
     productosFiltrados.forEach((producto, index) => {
         const inventarioBajo = producto.unidadesExistentes <= 5;
-        constante fila = document.createElement('tr');
-        fila.innerHTML = `
+        const row = document.createElement('tr');
+        row.innerHTML = `
             <td>${producto.nombre}</td>
             <td>${producto.descripcion}</td>
             <td>${producto.codigoBarras || 'N/A'}</td>
@@ -579,34 +579,34 @@ función buscarProducto() {
                 <button class="eliminar" onclick="eliminarProducto(${index})">Eliminar</button>
             </td>
         `;
-        tbody.appendChild(fila);
+        tbody.appendChild(row);
     });
 }
 
-function ajustarInventario(indice, operacion) {
-    // Si hay productos filtrados, obtenga el índice real en el array original
-    deje que indiceReal = índice;
+function ajustarInventario(index, operacion) {
+    // Si hay productos filtrados, obtener el índice real en el array original
+    let indiceReal = index;
     
-    si (productosFiltrados.length > 0) {
-        const productoFiltrado = productosFiltrados[índice];
-        si (!productoFiltrado) retorna;
+    if (productosFiltrados.length > 0) {
+        const productoFiltrado = productosFiltrados[index];
+        if (!productoFiltrado) return;
         
-        indiceReal = productos.findIndex(p =>
-            p.nombre === productoFiltrado.nombre &&
+        indiceReal = productos.findIndex(p => 
+            p.nombre === productoFiltrado.nombre && 
             p.descripcion === productoFiltrado.descripcion
         );
         
-        si (índiceReal === -1) {
+        if (indiceReal === -1) {
             showToast("Error: Producto no encontrado en la lista principal", 'error');
-            devolver;
+            return;
         }
     }
     
     const producto = productos[indiceReal];
     const cantidad = parseInt(prompt(`Ingrese la cantidad a ${operacion === 'sumar' ? 'sumar' : 'restar'}:`, "1")) || 0;
 
-    if (cantidad <= 0) { showToast("Ingrese una cantidad válida", 'error'); devolver; }
-    if (operacion === 'restar' && producto.unidadesExistentes < cantidad) { showToast("No hay suficientes unidades en inventario", 'error'); devolver; }
+    if (cantidad <= 0) { showToast("Ingrese una cantidad válida", 'error'); return; }
+    if (operacion === 'restar' && producto.unidadesExistentes < cantidad) { showToast("No hay suficientes unidades en inventario", 'error'); return; }
 
     producto.unidadesExistentes = operacion === 'sumar' ? producto.unidadesExistentes + cantidad : producto.unidadesExistentes - cantidad;
 
@@ -615,22 +615,22 @@ function ajustarInventario(indice, operacion) {
     showToast(`Inventario de ${producto.nombre} actualizado: ${producto.unidadesExistentes} unidades`, 'success');
 }
 
-función eliminarProducto(índice) {
-    // Si hay productos filtrados, obtenga el índice real en el array original
-    deje que indiceReal = índice;
+function eliminarProducto(index) {
+    // Si hay productos filtrados, obtener el índice real en el array original
+    let indiceReal = index;
     
-    si (productosFiltrados.length > 0) {
-        const productoFiltrado = productosFiltrados[índice];
-        si (!productoFiltrado) retorna;
+    if (productosFiltrados.length > 0) {
+        const productoFiltrado = productosFiltrados[index];
+        if (!productoFiltrado) return;
         
-        indiceReal = productos.findIndex(p =>
-            p.nombre === productoFiltrado.nombre &&
+        indiceReal = productos.findIndex(p => 
+            p.nombre === productoFiltrado.nombre && 
             p.descripcion === productoFiltrado.descripcion
         );
         
-        si (índiceReal === -1) {
+        if (indiceReal === -1) {
             showToast("Error: Producto no encontrado en la lista principal", 'error');
-            devolver;
+            return;
         }
     }
     
@@ -639,61 +639,61 @@ función eliminarProducto(índice) {
         productos.splice(indiceReal, 1);
         localStorage.setItem('productos', JSON.stringify(productos));
         actualizarLista();
-        showToast(`Producto eliminado: ${producto.nombre}`, 'éxito');
+        showToast(`Producto eliminado: ${producto.nombre}`, 'success');
     }
 }
 
 // ===== MÉTODOS DE PAGO Y VENTAS =====
-función finalizarVenta() {
-    if (carrito.length === 0) { showToast("El carrito está vacío", 'warning'); devolver; }
+function finalizarVenta() {
+    if (carrito.length === 0) { showToast("El carrito está vacío", 'warning'); return; }
 
-    const totalBs = carrito.reduce((suma, artículo) => suma + artículo.subtotal, 0);
-    const totalDolares = carrito.reduce((suma, item) => suma + item.subtotalDolar, 0);
+    const totalBs = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const totalDolares = carrito.reduce((sum, item) => sum + item.subtotalDolar, 0);
 
     document.getElementById('resumenTotalBs').textContent = `Total: Bs ${redondear2Decimales(totalBs).toFixed(2)}`;
     document.getElementById('resumenTotalDolares').textContent = `Total: $ ${redondear2Decimales(totalDolares).toFixed(2)}`;
 
-    document.getElementById('modalPago').style.display = 'bloque';
-    métodoPagoSeleccionado = null;
+    document.getElementById('modalPago').style.display = 'block';
+    metodoPagoSeleccionado = null;
     document.getElementById('detallesPago').style.display = 'none';
     document.getElementById('camposPago').innerHTML = '';
 }
 
-función cerrarModalPago() {
+function cerrarModalPago() {
     document.getElementById('modalPago').style.display = 'none';
-    métodoPagoSeleccionado = null;
+    metodoPagoSeleccionado = null;
     detallesPago = {};
 }
 
 function seleccionarMetodoPago(metodo) {
     metodoPagoSeleccionado = metodo;
     const detallesDiv = document.getElementById('camposPago');
-    const totalBs = carrito.reduce((suma, i) => suma + i.subtotal, 0);
+    const totalBs = carrito.reduce((sum, i) => sum + i.subtotal, 0);
     detallesDiv.innerHTML = '';
 
     // Limpio objeto detallesPago
-    detallesPago = { método, totalBs };
+    detallesPago = { metodo, totalBs };
 
     if (metodo === 'efectivo_bs' || metodo === 'efectivo_dolares') {
         detallesDiv.innerHTML = `
             <div class="campo-pago">
                 <label>Monto recibido (${metodo === 'efectivo_bs' ? 'Bs' : '$'}):</label>
-                <input type="número" id="montoRecibido" placeholder="Ingrese monto recibido" />
+                <input type="number" id="montoRecibido" placeholder="Ingrese monto recibido" />
             </div>
             <div class="campo-pago">
                 <label>Cambio:</label>
                 <input type="text" id="cambioCalculado" readonly placeholder="0.00" />
             </div>
         `;
-        establecerTiempo de espera(() => {
-            const input = document.getElementById('MontoRecibido');
-            si (!input) retorna;
-            entrada.addEventListener('entrada', () => {
-                const recib = parseFloat(entrada.valor) || 0;
-                sea ​​cambio = 0;
+        setTimeout(() => {
+            const input = document.getElementById('montoRecibido');
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const recib = parseFloat(input.value) || 0;
+                let cambio = 0;
                 if (metodo === 'efectivo_bs') cambio = redondear2Decimales(recib - totalBs);
-                demás {
-                    const totalEnDolares = tasaBCVGuardada ? redondear2Decimales(totalBs/tasaBCVGuardada) : 0;
+                else {
+                    const totalEnDolares = tasaBCVGuardada ? redondear2Decimales(totalBs / tasaBCVGuardada) : 0;
                     cambio = redondear2Decimales(recib - totalEnDolares);
                 }
                 document.getElementById('cambioCalculado').value = cambio >= 0 ? cambio.toFixed(2) : `Faltan ${Math.abs(cambio).toFixed(2)}`;
@@ -1100,3 +1100,97 @@ window.onclick = function(event) {
     const modal = document.getElementById('modalPago');
     if (event.target == modal) cerrarModalPago();
 };
+
+// ===== FUNCIONES DE RESPALDO Y RESTAURACIÓN =====
+function descargarBackup() {
+    try {
+        // Recopilar todos los datos del localStorage
+        const backupData = {
+            productos: JSON.parse(localStorage.getItem('productos')) || [],
+            nombreEstablecimiento: localStorage.getItem('nombreEstablecimiento') || '',
+            tasaBCV: localStorage.getItem('tasaBCV') || 0,
+            ventasDiarias: JSON.parse(localStorage.getItem('ventasDiarias')) || [],
+            carrito: JSON.parse(localStorage.getItem('carrito')) || [],
+            fechaBackup: new Date().toISOString(),
+            version: '1.0'
+        };
+
+        // Crear el archivo JSON
+        const dataStr = JSON.stringify(backupData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        // Crear un enlace de descarga
+        const downloadLink = document.createElement('a');
+        downloadLink.href = URL.createObjectURL(dataBlob);
+        downloadLink.download = `respaldo_calculadora_${new Date().toISOString().slice(0, 10)}.json`;
+        
+        // Simular clic en el enlace
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        
+        showToast('Respaldo descargado exitosamente', 'success');
+    } catch (error) {
+        console.error('Error al descargar respaldo:', error);
+        showToast('Error al descargar el respaldo', 'error');
+    }
+}
+
+function cargarBackup(files) {
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    if (!file.name.endsWith('.json')) {
+        showToast('Por favor selecciona un archivo JSON válido', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            const backupData = JSON.parse(e.target.result);
+            
+            // Validar estructura básica del archivo
+            if (!backupData.productos || !Array.isArray(backupData.productos)) {
+                throw new Error('Formato de archivo inválido');
+            }
+            
+            // Confirmar con el usuario antes de sobrescribir datos
+            if (confirm('¿Estás seguro de que deseas cargar este respaldo? Se sobrescribirán todos los datos actuales.')) {
+                // Restaurar datos en localStorage
+                localStorage.setItem('productos', JSON.stringify(backupData.productos));
+                localStorage.setItem('nombreEstablecimiento', backupData.nombreEstablecimiento || '');
+                localStorage.setItem('tasaBCV', backupData.tasaBCV || 0);
+                localStorage.setItem('ventasDiarias', JSON.stringify(backupData.ventasDiarias || []));
+                localStorage.setItem('carrito', JSON.stringify(backupData.carrito || []));
+                
+                // Recargar variables globales
+                productos = JSON.parse(localStorage.getItem('productos')) || [];
+                nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
+                tasaBCVGuardada = parseFloat(localStorage.getItem('tasaBCV')) || 0;
+                ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
+                carrito = JSON.parse(localStorage.getItem('carrito')) || [];
+                
+                // Actualizar interfaz
+                cargarDatosIniciales();
+                actualizarLista();
+                actualizarCarrito();
+                
+                showToast('Respaldo cargado exitosamente', 'success');
+            }
+        } catch (error) {
+            console.error('Error al cargar respaldo:', error);
+            showToast('Error al cargar el respaldo: archivo inválido', 'error');
+        }
+    };
+    
+    reader.onerror = function() {
+        showToast('Error al leer el archivo', 'error');
+    };
+    
+    reader.readAsText(file);
+    
+    // Limpiar el input de archivo
+    document.getElementById('fileInput').value = '';
+}
