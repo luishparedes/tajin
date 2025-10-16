@@ -4,35 +4,199 @@ let nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
 let tasaBCVGuardada = parseFloat(localStorage.getItem('tasaBCV')) || 0;
 let ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
-let metodoPagoSeleccionado = null;
-let detallesPago = {}; // guardará info temporal al confirmar el pago
+let métodoPagoSeleccionado = null;
+let detallesPago = {}; // guardará información temporal al confirmar el pago
 let productoEditando = null;
 let productosFiltrados = []; // Array para almacenar resultados de búsqueda
 
-// ===== SISTEMA DE REDIRECCIÓN POR INACTIVIDAD ===== //
-const TIEMPO_INACTIVIDAD = 10 * 60 * 1000; // 10 minutos en milisegundos
+// === NUEVAS VARIABLES PARA ESCÁNER ===
+let tiempoUltimaTecla = 0;
+let bufferEscaneo = '';
+
+// ===== PROTECCIÓN CONTRA ACCESO DIRECTO (SIMPLIFICADA PARA MÓVIL Y COMPUTADORA) =====
+(function() {
+    const SESSION_KEY = 'calculadora_magica_session';
+    const URL_REDIRECCION_PORTAL = "http://portal.calculadoramagica.lat/";
+    
+    // Verificar si ya tiene sesión activa
+    const sessionValida = sessionStorage.getItem(SESSION_KEY);
+    
+    // Si no tiene sesión y no viene del portal, redirigir
+    if (!sessionValida) {
+        const referrer = document.referrer;
+        const vieneDePortal = referrer && referrer.includes('portal.calculadoramagica.lat');
+        const vieneDeClientes = referrer && referrer.includes('clientes.calculadoramagica.lat');
+        
+        // Permitir acceso si viene del portal, de clientes, o si no hay referrer (móviles)
+        if (!vieneDePortal && !vieneDeClientes && referrer !== '') {
+            console.log('Acceso directo detectado, redirigiendo al portal...');
+            window.location.href = URL_REDIRECCION_PORTAL;
+            return;
+        }
+        
+        // Crear sesión válida
+        sessionStorage.setItem(SESSION_KEY, 'activa_' + Date.now());
+    }
+})();
+
+// ===== SISTEMA DE REDIRECCIÓN POR INACTIVIDAD MEJORADO ===== //
+const TIEMPO_INACTIVIDAD = 4 * 60 * 1000; // 4 minutos en milisegundos
 const URL_REDIRECCION = "http://portal.calculadoramagica.lat/";
 
 let temporizadorInactividad;
+let ultimaActividad = Date.now();
+
+// Función para registrar actividad
+function registrarActividad() {
+    ultimaActividad = Date.now();
+    reiniciarTemporizador();
+}
+
+// Función para verificar inactividad periódicamente
+function verificarInactividad() {
+    const tiempoTranscurrido = Date.now() - ultimaActividad;
+    
+    if (tiempoTranscurrido >= TIEMPO_INACTIVIDAD) {
+        // Redirigir por inactividad
+        console.log('Redirigiendo por inactividad después de', Math.round(tiempoTranscurrido / 1000), 'segundos');
+        
+        // Limpiar sesiones
+        sessionStorage.removeItem('calculadora_magica_session');
+        localStorage.removeItem('ultimaActividad');
+        
+        // Redirigir al portal
+        window.location.href = URL_REDIRECCION;
+        return;
+    }
+    
+    // Programar siguiente verificación
+    setTimeout(verificarInactividad, 1000);
+}
 
 function reiniciarTemporizador() {
-    // Limpiar el temporizador existente
-    clearTimeout(temporizadorInactividad);
+    // Guardar timestamp de última actividad
+    localStorage.setItem('ultimaActividad', Date.now().toString());
+    
+    // Limpiar temporizador existente
+    if (temporizadorInactividad) {
+        clearTimeout(temporizadorInactividad);
+    }
     
     // Iniciar nuevo temporizador
     temporizadorInactividad = setTimeout(() => {
+        console.log('Temporizador de inactividad ejecutado');
+        
+        // Limpiar sesiones
+        sessionStorage.removeItem('calculadora_magica_session');
+        localStorage.removeItem('ultimaActividad');
+        
         // Redirigir después del tiempo de inactividad
         window.location.href = URL_REDIRECCION;
     }, TIEMPO_INACTIVIDAD);
 }
 
 // Eventos que indican actividad del usuario
-['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(evento => {
-    document.addEventListener(evento, reiniciarTemporizador);
+['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'input'].forEach(evento => {
+    document.addEventListener(evento, registrarActividad, { passive: true });
 });
 
-// Iniciar el temporizador por primera vez
-reiniciarTemporizador();
+// Inicializar sistema de inactividad
+function inicializarSistemaInactividad() {
+    // Recuperar última actividad desde localStorage
+    const ultimaActividadGuardada = localStorage.getItem('ultimaActividad');
+    if (ultimaActividadGuardada) {
+        ultimaActividad = parseInt(ultimaActividadGuardada);
+        
+        // Verificar si ya pasó el tiempo de inactividad
+        const tiempoTranscurrido = Date.now() - ultimaActividad;
+        if (tiempoTranscurrido >= TIEMPO_INACTIVIDAD) {
+            console.log('Sesión expirada al cargar. Redirigiendo...');
+            sessionStorage.removeItem('calculadora_magica_session');
+            localStorage.removeItem('ultimaActividad');
+            window.location.href = URL_REDIRECCION;
+            return;
+        }
+    }
+    
+    // Iniciar verificaciones
+    reiniciarTemporizador();
+    verificarInactividad();
+}
+
+// ===== PROTECCIÓN CONTRA F12 Y HERRAMIENTAS DE DESARROLLO =====
+(function() {
+    // Detectar tecla F12 y combinaciones de teclas
+    document.addEventListener('keydown', function(e) {
+        // Bloquear F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+I (DevTools)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.keyCode === 73)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+J (Console)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.keyCode === 74)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+C (Inspector)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.keyCode === 67)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+U (Ver código fuente)
+        if (e.ctrlKey && (e.key === 'U' || e.keyCode === 85)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+    });
+    
+    // Bloquear clic derecho (inspeccionar elemento)
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        mostrarAdvertenciaSeguridad();
+        return false;
+    });
+    
+    // Detectar si se abren las herramientas de desarrollo
+    function detectarDevTools() {
+        const umbral = 160;
+        const inicio = performance.now();
+        debugger;
+        const fin = performance.now();
+        
+        if (fin - inicio > umbral) {
+            mostrarAdvertenciaSeguridad();
+        }
+    }
+    
+    function mostrarAdvertenciaSeguridad() {
+        // Mostrar mensaje en consola si está abierta
+        console.log('%c⚠️ ACCESO RESTRINGIDO ⚠️', 'color: red; font-size: 20px; font-weight: bold;');
+        console.log('El uso de herramientas de desarrollo está restringido en esta aplicación.');
+        
+        // Mostrar alerta al usuario
+        alert('⚠️ Acceso restringido\nEl uso de F12 y herramientas de desarrollo no está permitido en esta aplicación.');
+        
+        // Opcional: Puedes redirigir o tomar otras acciones
+        // window.location.href = '/acceso-denegado';
+    }
+    
+    // Verificar periódicamente si las herramientas están abiertas
+    setInterval(detectarDevTools, 1000);
+})();
 
 // ===== FUNCIÓN PARA REDONDEAR A 2 DECIMALES =====
 function redondear2Decimales(numero) {
@@ -43,6 +207,7 @@ function redondear2Decimales(numero) {
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Calculadora iniciada correctamente');
+    inicializarSistemaInactividad(); // Inicializar sistema de inactividad
     cargarDatosIniciales();
     actualizarLista();
     actualizarCarrito();
@@ -66,7 +231,7 @@ function showToast(message, type = 'success', duration = 3500) {
     }, duration);
 }
 
-// ===== CONFIGURACIÓN DE EVENTOS =====
+// ===== CONFIGURACIÓN DE EVENTOS MEJORADA =====
 function configurarEventos() {
     // Búsqueda enter
     const buscarInput = document.getElementById('buscar');
@@ -76,13 +241,109 @@ function configurarEventos() {
         });
     }
 
-    // Scanner enter
+    // ESCÁNER MEJORADO - Compatibilidad universal
     const codigoInput = document.getElementById('codigoBarrasInput');
     if (codigoInput) {
-        codigoInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') agregarPorCodigoBarras();
+        // Detectar escaneo vs tecleo manual
+        codigoInput.addEventListener('keydown', function(e) {
+            const tiempoActual = new Date().getTime();
+            
+            // Si es Enter o Tab (terminadores comunes de escáner)
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                
+                // Solo procesar si hay contenido y no es tecleo manual rápido
+                if (this.value.trim() && (tiempoActual - tiempoUltimaTecla) < 100) {
+                    procesarEscaneo(this.value.trim());
+                    this.value = '';
+                }
+                return;
+            }
+            
+            // Para caracteres normales, actualizar buffer y tiempo
+            if (e.key.length === 1) {
+                bufferEscaneo += e.key;
+                tiempoUltimaTecla = tiempoActual;
+                
+                // Limpiar buffer después de un tiempo si no hay más teclas
+                clearTimeout(window.bufferTimeout);
+                window.bufferTimeout = setTimeout(() => {
+                    if (bufferEscaneo.length > 0) {
+                        bufferEscaneo = '';
+                    }
+                }, 60);
+            }
+        });
+
+        // También mantener el evento input para sugerencias
+        codigoInput.addEventListener('input', function() {
+            const termino = this.value.trim().toLowerCase();
+            const sugerenciasDiv = document.getElementById('sugerencias');
+            if (!sugerenciasDiv) return;
+            sugerenciasDiv.innerHTML = '';
+
+            if (termino.length < 2) return;
+
+            const coincidencias = productos.filter(p =>
+                (p.nombre || p.producto || '').toLowerCase().includes(termino) ||
+                (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termino))
+            );
+
+            coincidencias.slice(0, 8).forEach(prod => {
+                const opcion = document.createElement('div');
+                opcion.textContent = `${(prod.nombre || prod.producto)} (${prod.descripcion || prod.descripcion})`;
+                opcion.onclick = function() {
+                    document.getElementById('codigoBarrasInput').value = prod.codigoBarras || prod.nombre || prod.producto;
+                    procesarEscaneo(document.getElementById('codigoBarrasInput').value);
+                    sugerenciasDiv.innerHTML = '';
+                    document.getElementById('codigoBarrasInput').focus();
+                };
+                sugerenciasDiv.appendChild(opcion);
+            });
+        });
+
+        // Focus automático mejorado - EXCLUIR CAMPOS DE CONFIGURACIÓN
+        codigoInput.addEventListener('blur', function() {
+            // Recuperar focus después de un breve momento, pero solo si no estamos en campos de configuración
+            setTimeout(() => {
+                const activeElement = document.activeElement;
+                const esCampoConfiguracion = activeElement && 
+                    (activeElement.id === 'tasaBCV' || 
+                     activeElement.id === 'nombreEstablecimiento' ||
+                     activeElement.closest('.config-section'));
+                
+                if (!esCampoConfiguracion && 
+                    (!activeElement || 
+                     !activeElement.matches('button, input[type="text"], select, textarea'))) {
+                    codigoInput.focus();
+                }
+            }, 100);
         });
     }
+
+    // Focus automático al cargar la página
+    setTimeout(() => {
+        if (codigoInput) {
+            codigoInput.focus();
+            codigoInput.select();
+        }
+    }, 500);
+
+    // PREVENIR QUE EL CAMPOS DE CONFIGURACIÓN ACTIVEN EL REDIRECCIONAMIENTO DEL ESCÁNER
+    const camposConfiguracion = ['tasaBCV', 'nombreEstablecimiento'];
+    camposConfiguracion.forEach(id => {
+        const campo = document.getElementById(id);
+        if (campo) {
+            campo.addEventListener('focus', function() {
+                // Desactivar temporalmente el comportamiento del escáner
+                this.setAttribute('data-scanning-disabled', 'true');
+            });
+            campo.addEventListener('blur', function() {
+                // Reactivar el comportamiento del escáner
+                this.removeAttribute('data-scanning-disabled');
+            });
+        }
+    });
 }
 
 // ===== BUSCADOR RÁPIDO (input del carrito con sugerencias) =====
@@ -295,55 +556,7 @@ function editarProducto(index) {
 // ===== CARRITO DE VENTAS =====
 function agregarPorCodigoBarras() {
     const codigo = document.getElementById('codigoBarrasInput').value.trim();
-    if (!codigo) { showToast("Ingrese o escanee un código de barras", 'warning'); return; }
-
-    // Buscar por código exacto primero
-    let productoEncontrado = productos.find(p =>
-        p.codigoBarras && p.codigoBarras.toLowerCase() === codigo.toLowerCase()
-    );
-
-    // Buscar por nombre si no encontrado por código
-    if (!productoEncontrado) {
-        productoEncontrado = productos.find(p =>
-            (p.nombre || '').toLowerCase().includes(codigo.toLowerCase()) ||
-            (p.producto || '').toLowerCase().includes(codigo.toLowerCase())
-        );
-        if (!productoEncontrado) {
-            showToast("Producto no encontrado", 'error');
-            return;
-        }
-    }
-
-    // Verificar si ya está en el carrito (mismo nombre y unidad 'unidad')
-    const enCarrito = carrito.findIndex(item => item.nombre === productoEncontrado.nombre && item.unidad === 'unidad');
-
-    if (enCarrito !== -1) {
-        // Actualizar cantidad (unidad)
-        carrito[enCarrito].cantidad += 1;
-        carrito[enCarrito].subtotal = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioBolivar);
-        carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioDolar);
-    } else {
-        // Agregar nuevo producto (por defecto unidad)
-        carrito.push({
-            nombre: productoEncontrado.nombre,
-            descripcion: productoEncontrado.descripcion,
-            precioUnitarioBolivar: productoEncontrado.precioUnitarioBolivar,
-            precioUnitarioDolar: productoEncontrado.precioUnitarioDolar,
-            cantidad: 1,
-            unidad: 'unidad',
-            subtotal: productoEncontrado.precioUnitarioBolivar,
-            subtotalDolar: productoEncontrado.precioUnitarioDolar,
-            indexProducto: productos.findIndex(p => p.nombre === productoEncontrado.nombre)
-        });
-    }
-
-    document.getElementById('codigoBarrasInput').value = '';
-    document.getElementById('codigoBarrasInput').focus();
-    const scannerStatus = document.getElementById('scannerStatus');
-    if (scannerStatus) scannerStatus.textContent = 'Producto agregado. Esperando nuevo escaneo...';
-
-    localStorage.setItem('carrito', JSON.stringify(carrito));
-    actualizarCarrito();
+    procesarEscaneo(codigo);
 }
 
 function actualizarCarrito() {
@@ -563,7 +776,7 @@ function buscarProducto() {
         row.innerHTML = `
             <td>${producto.nombre}</td>
             <td>${producto.descripcion}</td>
-            <td>${producto.codigoBarras || 'N/A'}</td>
+            <td>${producto.codigoBarras || 'N/A'}}</td>
             <td class="${inventarioBajo ? 'inventario-bajo' : ''}">${producto.unidadesExistentes}</td>
             <td>
                 <div class="ajuste-inventario">
@@ -1001,31 +1214,238 @@ function generarReporteDiario() {
     doc.save(`reporte_diario_${(new Date()).toISOString().slice(0,10)}.pdf`);
 }
 
-// ===== PDF LISTA DE PRODUCTOS (orden alfabético, $ and Bs with ganancia) =====
-function generarRespaldoCompleto() {
-    if (!productos.length) { showToast("No hay productos para generar PDF", 'warning'); return; }
+// ===== NUEVAS FUNCIONALIDADES INNOVADORAS =====
 
-    const copia = [...productos].sort((a, b) => (a.nombre || '').localeCompare((b.nombre || ''), 'es', { sensitivity: 'base' }));
-    const rows = copia.map(p => [
+// ===== PDF POR CATEGORÍA =====
+function mostrarOpcionesPDF() {
+    document.getElementById('modalCategorias').style.display = 'block';
+}
+
+function cerrarModalCategorias() {
+    document.getElementById('modalCategorias').style.display = 'none';
+}
+
+function generarPDFPorCategoria(categoria) {
+    if (!productos.length) { 
+        showToast("No hay productos para generar PDF", 'warning'); 
+        return; 
+    }
+
+    let productosFiltrados = [];
+    let tituloCategoria = '';
+
+    if (categoria === 'todos') {
+        productosFiltrados = [...productos];
+        tituloCategoria = 'TODOS LOS PRODUCTOS';
+    } else {
+        productosFiltrados = productos.filter(p => p.descripcion === categoria);
+        
+        // Mapear el valor de la categoría a un nombre legible
+        const nombresCategorias = {
+            'viveres': 'VÍVERES',
+            'bebidas': 'BEBIDAS',
+            'licores': 'LICORES',
+            'enlatados': 'ENLATADOS',
+            'plasticos': 'PLÁSTICOS',
+            'papeleria': 'PAPELERÍA',
+            'lacteos': 'LÁCTEOS',
+            'ferreteria': 'FERRETERÍA',
+            'agropecuaria': 'AGROPECUARIA',
+            'frigorifico': 'FRIGORÍFICO',
+            'pescaderia': 'PESCADERÍA',
+            'repuesto': 'REPUESTO',
+            'confiteria': 'CONFITERÍA',
+            'ropa': 'ROPA',
+            'calzados': 'CALZADOS',
+            'charcuteria': 'CHARCUTERÍA',
+            'carnes': 'CARNES',
+            'aseo_personal': 'ASEO PERSONAL',
+            'limpieza': 'PRODUCTOS DE LIMPIEZA',
+            'verduras': 'VERDURAS',
+            'frutas': 'FRUTAS',
+            'hortalizas': 'HORTALIZAS',
+            'aliños': 'ALIÑOS',
+            'otros': 'OTROS'
+        };
+        
+        tituloCategoria = nombresCategorias[categoria] || categoria.toUpperCase();
+    }
+
+    if (productosFiltrados.length === 0) {
+        showToast(`No hay productos en la categoría: ${tituloCategoria}`, 'warning');
+        cerrarModalCategorias();
+        return;
+    }
+
+    // Ordenar alfabéticamente
+    productosFiltrados.sort((a, b) => (a.nombre || '').localeCompare((b.nombre || ''), 'es', { sensitivity: 'base' }));
+
+    const rows = productosFiltrados.map(p => [
         p.nombre,
-        p.descripcion,
         `$${p.precioUnitarioDolar.toFixed(2)}`,
         `Bs ${p.precioUnitarioBolivar.toFixed(2)}`
     ]);
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text(nombreEstablecimiento || 'Lista de Productos', 14, 18);
 
+    // Encabezado
+    doc.setFontSize(16);
+    doc.text(nombreEstablecimiento || 'Lista de Productos', 14, 18);
+    doc.setFontSize(12);
+    doc.text(`Categoría: ${tituloCategoria}`, 14, 26);
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${(new Date()).toLocaleDateString()}`, 14, 34);
+
+    // Tabla
     doc.autoTable({
-        head: [['Producto', 'Descripción', 'Precio ($)', 'Precio (Bs)']],
+        head: [['Producto', 'Precio ($)', 'Precio (Bs)']],
         body: rows,
-        startY: 28,
-        styles: { fontSize: 9 }
+        startY: 42,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [38, 198, 218] }
     });
 
-    doc.save(`lista_productos_${(new Date()).toISOString().slice(0,10)}.pdf`);
+    doc.save(`lista_${categoria}_${(new Date()).toISOString().slice(0,10)}.pdf`);
+    cerrarModalCategorias();
+    showToast(`PDF generado para: ${tituloCategoria}`, 'success');
+}
+
+// ===== ETIQUETAS PARA ANAQUELES =====
+function generarEtiquetasAnaqueles() {
+    document.getElementById('modalEtiquetas').style.display = 'block';
+}
+
+function cerrarModalEtiquetas() {
+    document.getElementById('modalEtiquetas').style.display = 'none';
+}
+
+function generarEtiquetasPorCategoria(categoria) {
+    if (!productos.length) { 
+        showToast("No hay productos para generar etiquetas", 'warning'); 
+        return; 
+    }
+
+    let productosFiltrados = [];
+    let tituloCategoria = '';
+
+    if (categoria === 'todos') {
+        productosFiltrados = [...productos];
+        tituloCategoria = 'TODOS LOS PRODUCTOS';
+    } else {
+        productosFiltrados = productos.filter(p => p.descripcion === categoria);
+        
+        const nombresCategorias = {
+            'viveres': 'VÍVERES',
+            'bebidas': 'BEBIDAS',
+            'licores': 'LICORES',
+            'enlatados': 'ENLATADOS',
+            'plasticos': 'PLÁSTICOS',
+            'papeleria': 'PAPELERÍA',
+            'lacteos': 'LÁCTEOS',
+            'ferreteria': 'FERRETERÍA',
+            'agropecuaria': 'AGROPECUARIA',
+            'frigorifico': 'FRIGORÍFICO',
+            'pescaderia': 'PESCADERÍA',
+            'repuesto': 'REPUESTO',
+            'confiteria': 'CONFITERÍA',
+            'ropa': 'ROPA',
+            'calzados': 'CALZADOS',
+            'charcuteria': 'CHARCUTERÍA',
+            'carnes': 'CARNES',
+            'aseo_personal': 'ASEO PERSONAL',
+            'limpieza': 'PRODUCTOS DE LIMPIEZA',
+            'verduras': 'VERDURAS',
+            'frutas': 'FRUTAS',
+            'hortalizas': 'HORTALIZAS',
+            'aliños': 'ALIÑOS',
+            'otros': 'OTROS'
+        };
+        
+        tituloCategoria = nombresCategorias[categoria] || categoria.toUpperCase();
+    }
+
+    if (productosFiltrados.length === 0) {
+        showToast(`No hay productos en la categoría: ${tituloCategoria}`, 'warning');
+        cerrarModalEtiquetas();
+        return;
+    }
+
+    // Ordenar alfabéticamente
+    productosFiltrados.sort((a, b) => (a.nombre || '').localeCompare((b.nombre || ''), 'es', { sensitivity: 'base' }));
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    // Configuración de etiquetas
+    const pageWidth = 210; // A4 width in mm
+    const pageHeight = 297; // A4 height in mm
+    const margin = 10;
+    const labelWidth = 63; // 3 columnas
+    const labelHeight = 35; // Altura de cada etiqueta
+    const labelsPerPage = 21; // 3 columnas x 7 filas
+
+    let currentPage = 0;
+    let labelIndex = 0;
+
+    productosFiltrados.forEach((producto, index) => {
+        if (labelIndex >= labelsPerPage) {
+            doc.addPage();
+            currentPage++;
+            labelIndex = 0;
+        }
+
+        const row = Math.floor(labelIndex / 3);
+        const col = labelIndex % 3;
+        
+        const x = margin + (col * labelWidth);
+        const y = margin + (row * labelHeight);
+
+        // Dibujar cuadro de etiqueta
+        doc.setDrawColor(200, 200, 200);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(x, y, labelWidth - 2, labelHeight - 2, 'FD');
+
+        // Nombre del establecimiento (más pequeño)
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(nombreEstablecimiento || 'TIENDA', x + 2, y + 5);
+
+        // Nombre del producto
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        const nombreProducto = producto.nombre.length > 25 ? 
+            producto.nombre.substring(0, 25) + '...' : producto.nombre;
+        doc.text(nombreProducto, x + 2, y + 10);
+
+        // Precio en bolívares (grande y destacado)
+        doc.setFontSize(14);
+        doc.setTextColor(220, 0, 0);
+        doc.setFont(undefined, 'bold');
+        doc.text(`Bs ${producto.precioUnitarioBolivar.toFixed(2)}`, x + 2, y + 20);
+
+        // Categoría (pequeño)
+        doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Categoría: ${tituloCategoria}`, x + 2, y + 25);
+
+        // Código de barras si existe
+        if (producto.codigoBarras) {
+            doc.setFontSize(6);
+            doc.text(`Cód: ${producto.codigoBarras}`, x + 2, y + 30);
+        }
+
+        labelIndex++;
+    });
+
+    doc.save(`etiquetas_${categoria}_${(new Date()).toISOString().slice(0,10)}.pdf`);
+    cerrarModalEtiquetas();
+    showToast(`Etiquetas generadas para: ${tituloCategoria}`, 'success');
 }
 
 // ===== Imprimir ticket térmico (abre una ventana con formato estrecho y llama print) =====
@@ -1099,6 +1519,12 @@ function imprimirTicketTermico(detalles) {
 window.onclick = function(event) {
     const modal = document.getElementById('modalPago');
     if (event.target == modal) cerrarModalPago();
+    
+    const modalCategorias = document.getElementById('modalCategorias');
+    if (event.target == modalCategorias) cerrarModalCategorias();
+    
+    const modalEtiquetas = document.getElementById('modalEtiquetas');
+    if (event.target == modalEtiquetas) cerrarModalEtiquetas();
 };
 
 // ===== FUNCIONES DE RESPALDO Y RESTAURACIÓN =====
@@ -1193,4 +1619,120 @@ function cargarBackup(files) {
     
     // Limpiar el input de archivo
     document.getElementById('fileInput').value = '';
+}
+
+// ===== NUEVAS FUNCIONES PARA ESCÁNER MEJORADO =====
+function procesarEscaneo(codigo) {
+    if (!codigo) {
+        showToast("Código de barras vacío", 'warning');
+        return;
+    }
+
+    // Buscar por código exacto primero
+    let productoEncontrado = productos.find(p =>
+        p.codigoBarras && p.codigoBarras.toLowerCase() === codigo.toLowerCase()
+    );
+
+    // Si no se encuentra por código, buscar por nombre exacto
+    if (!productoEncontrado) {
+        productoEncontrado = productos.find(p =>
+            (p.nombre || '').toLowerCase() === codigo.toLowerCase()
+        );
+    }
+
+    // Si aún no se encuentra, buscar por coincidencia parcial en nombre
+    if (!productoEncontrado) {
+        productoEncontrado = productos.find(p =>
+            (p.nombre || '').toLowerCase().includes(codigo.toLowerCase())
+        );
+    }
+
+    if (!productoEncontrado) {
+        showToast("Producto no encontrado: " + codigo, 'error');
+        mostrarSugerenciasEspecificas(codigo);
+        return;
+    }
+
+    // AGREGAR AL CARRITO
+    agregarProductoAlCarrito(productoEncontrado);
+    darFeedbackEscaneoExitoso();
+}
+
+function agregarProductoAlCarrito(productoEncontrado) {
+    // Verificar si ya está en el carrito (mismo nombre y unidad 'unidad')
+    const enCarrito = carrito.findIndex(item => item.nombre === productoEncontrado.nombre && item.unidad === 'unidad');
+
+    if (enCarrito !== -1) {
+        // Actualizar cantidad (unidad)
+        carrito[enCarrito].cantidad += 1;
+        carrito[enCarrito].subtotal = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioBolivar);
+        carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioDolar);
+    } else {
+        // Agregar nuevo producto (por defecto unidad)
+        carrito.push({
+            nombre: productoEncontrado.nombre,
+            descripcion: productoEncontrado.descripcion,
+            precioUnitarioBolivar: productoEncontrado.precioUnitarioBolivar,
+            precioUnitarioDolar: productoEncontrado.precioUnitarioDolar,
+            cantidad: 1,
+            unidad: 'unidad',
+            subtotal: productoEncontrado.precioUnitarioBolivar,
+            subtotalDolar: productoEncontrado.precioUnitarioDolar,
+            indexProducto: productos.findIndex(p => p.nombre === productoEncontrado.nombre)
+        });
+    }
+
+    // Limpiar y focus
+    const codigoInput = document.getElementById('codigoBarrasInput');
+    if (codigoInput) {
+        codigoInput.value = '';
+        codigoInput.focus();
+    }
+
+    const scannerStatus = document.getElementById('scannerStatus');
+    if (scannerStatus) scannerStatus.textContent = '✓ Producto agregado. Escanee siguiente...';
+
+    localStorage.setItem('carrito', JSON.stringify(carrito));
+    actualizarCarrito();
+}
+
+function mostrarSugerenciasEspecificas(codigo) {
+    const sugerenciasDiv = document.getElementById('sugerencias');
+    if (!sugerenciasDiv) return;
+
+    sugerenciasDiv.innerHTML = '<div style="color: #ff6b6b; padding: 5px;">Producto no encontrado. Sugerencias:</div>';
+
+    // Buscar productos similares
+    const similares = productos.filter(p =>
+        (p.nombre || '').toLowerCase().includes(codigo.toLowerCase().substring(0, 3)) ||
+        (p.codigoBarras && p.codigoBarras.toLowerCase().includes(codigo.toLowerCase().substring(0, 3)))
+    ).slice(0, 5);
+
+    similares.forEach(prod => {
+        const opcion = document.createElement('div');
+        opcion.style.cursor = 'pointer';
+        opcion.style.padding = '5px';
+        opcion.style.borderBottom = '1px solid #eee';
+        opcion.innerHTML = `<strong>${prod.nombre}</strong> - ${prod.descripcion}`;
+        opcion.onclick = function() {
+            agregarProductoAlCarrito(prod);
+            sugerenciasDiv.innerHTML = '';
+        };
+        sugerenciasDiv.appendChild(opcion);
+    });
+
+    if (similares.length === 0) {
+        sugerenciasDiv.innerHTML += '<div style="padding: 5px;">No se encontraron productos similares</div>';
+    }
+}
+
+function darFeedbackEscaneoExitoso() {
+    // Cambio visual breve en el input
+    const codigoInput = document.getElementById('codigoBarrasInput');
+    if (codigoInput) {
+        codigoInput.style.backgroundColor = '#d4edda';
+        setTimeout(() => {
+            codigoInput.style.backgroundColor = '';
+        }, 300);
+    }
 }
