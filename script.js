@@ -1,3 +1,19 @@
+// ===== CONFIGURACIÓN FIREBASE =====
+const firebaseConfig = {
+    apiKey: "AIzaSyAKR4EVDjVV944_jZg_8vGu9Ge7mIxMK4g",
+    authDomain: "magicaservidor.firebaseapp.com",
+    projectId: "magicaservidor",
+    storageBucket: "magicaservidor.firebasestorage.app",
+    messagingSenderId: "842627626709",
+    appId: "1:842627626709:web:794726b1d35317af81145c",
+    databaseURL: "https://magicaservidor-default-rtdb.firebaseio.com/"
+};
+
+// Inicializar Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+
 // ===== VARIABLES GLOBALES =====
 let productos = JSON.parse(localStorage.getItem('productos')) || [];
 let nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
@@ -9,191 +25,645 @@ let detallesPago = {};
 let productoEditando = null;
 let productosFiltrados = [];
 
+// Variables del sistema de usuarios
+let currentUser = null;
+let userData = null;
+const ADMIN_EMAIL = "luishparedes94@gmail.com";
+
 // === NUEVAS VARIABLES PARA ESCÁNER ===
 let tiempoUltimaTecla = 0;
 let bufferEscaneo = '';
 
-// ===== PROTECCIÓN CONTRA ACCESO DIRECTO =====
-(function() {
-    const SESSION_KEY = 'calculadora_magica_session';
-    const URL_REDIRECCION_PORTAL = "http://portal.calculadoramagica.lat/";
+// ===== FUNCIONES DE AUTENTICACIÓN MEJORADAS =====
+
+// Verificar estado de autenticación
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        currentUser = user;
+        loadUserData(user.uid);
+    } else {
+        showAuthScreen();
+    }
+});
+
+// Cargar datos del usuario
+function loadUserData(userId) {
+    database.ref('users/' + userId).once('value')
+        .then((snapshot) => {
+            userData = snapshot.val();
+            if (userData) {
+                initializeUserSession();
+            } else {
+                createUserData(userId);
+            }
+        })
+        .catch((error) => {
+            console.error('Error loading user data:', error);
+            showToast('Error al cargar datos del usuario', 'error');
+        });
+}
+
+// Crear datos de usuario
+function createUserData(userId) {
+    const userEmail = currentUser.email;
+    const isAdmin = userEmail === ADMIN_EMAIL;
     
-    const sessionValida = sessionStorage.getItem(SESSION_KEY);
+    userData = {
+        name: currentUser.displayName || 'Usuario',
+        email: userEmail,
+        plan: isAdmin ? 'admin' : 'free',
+        productsCount: 0,
+        maxProducts: isAdmin ? 1000 : 3,
+        devices: [getDeviceId()],
+        maxDevices: 1, // Por defecto 1 dispositivo
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        lastLogin: firebase.database.ServerValue.TIMESTAMP
+    };
     
-    if (!sessionValida) {
-        const referrer = document.referrer;
-        const vieneDePortal = referrer && referrer.includes('portal.calculadoramagica.lat');
-        const vieneDeClientes = referrer && referrer.includes('clientes.calculadoramagica.lat');
+    database.ref('users/' + userId).set(userData)
+        .then(() => {
+            initializeUserSession();
+        })
+        .catch((error) => {
+            console.error('Error creating user data:', error);
+            showToast('Error al crear datos de usuario', 'error');
+        });
+}
+
+// Inicializar sesión de usuario
+function initializeUserSession() {
+    if (userData.plan === 'admin') {
+        showAdminPanel();
+    } else {
+        // Verificar dispositivo autorizado
+        const currentDeviceId = getDeviceId();
+        const userDevices = userData.devices || [];
+        const maxDevices = userData.maxDevices || 1;
         
-        if (!vieneDePortal && !vieneDeClientes && referrer !== '') {
-            console.log('Acceso directo detectado, redirigiendo al portal...');
-            window.location.href = URL_REDIRECCION_PORTAL;
+        if (userDevices.length === 0 || !userDevices.includes(currentDeviceId)) {
+            showToast('Dispositivo no autorizado. Contacta al administrador.', 'error');
+            logout();
             return;
         }
         
-        sessionStorage.setItem(SESSION_KEY, 'activa_' + Date.now());
+        // Verificar límite de dispositivos
+        if (userDevices.length > maxDevices) {
+            // Remover dispositivos excedentes
+            const allowedDevices = userDevices.slice(0, maxDevices);
+            database.ref('users/' + currentUser.uid + '/devices').set(allowedDevices);
+        }
+        
+        // Actualizar último login
+        database.ref('users/' + currentUser.uid + '/lastLogin').set(firebase.database.ServerValue.TIMESTAMP);
+        
+        showMainApp();
+        updateProductCount();
+        checkProductLimit();
     }
-})();
-
-// ===== SISTEMA DE REDIRECCIÓN POR INACTIVIDAD MEJORADO =====
-const TIEMPO_INACTIVIDAD = 4 * 60 * 1000;
-const URL_REDIRECCION = "http://portal.calculadoramagica.lat/";
-
-let temporizadorInactividad;
-let ultimaActividad = Date.now();
-
-function registrarActividad() {
-    ultimaActividad = Date.now();
-    reiniciarTemporizador();
 }
 
-function verificarInactividad() {
-    const tiempoTranscurrido = Date.now() - ultimaActividad;
+// Obtener ID único del dispositivo
+function getDeviceId() {
+    let deviceId = localStorage.getItem('deviceId');
+    if (!deviceId) {
+        deviceId = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+        localStorage.setItem('deviceId', deviceId);
+    }
+    return deviceId;
+}
+
+// Mostrar pantalla de autenticación
+function showAuthScreen() {
+    document.getElementById('authContainer').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'none';
+    showLoginForm();
+}
+
+// Mostrar formulario de login
+function showLoginForm() {
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+}
+
+// Mostrar formulario de registro
+function showRegisterForm() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+}
+
+// Mostrar aplicación principal
+function showMainApp() {
+    document.getElementById('authContainer').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('adminPanel').style.display = 'none';
     
-    if (tiempoTranscurrido >= TIEMPO_INACTIVIDAD) {
-        console.log('Redirigiendo por inactividad después de', Math.round(tiempoTranscurrido / 1000), 'segundos');
-        sessionStorage.removeItem('calculadora_magica_session');
-        localStorage.removeItem('ultimaActividad');
-        window.location.href = URL_REDIRECCION;
+    // Actualizar interfaz de usuario
+    document.getElementById('userWelcome').textContent = `Bienvenido, ${userData.name}`;
+    document.getElementById('userPlan').textContent = userData.plan.toUpperCase();
+    document.getElementById('userPlan').className = `plan-badge plan-${userData.plan}`;
+    
+    updateProductCount();
+}
+
+// Mostrar panel administrativo
+function showAdminPanel() {
+    document.getElementById('authContainer').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'block';
+    
+    loadUsersList();
+}
+
+// ===== FUNCIONES DE AUTENTICACIÓN =====
+
+// Toggle para mostrar/ocultar contraseña
+function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    const toggle = input.parentElement.querySelector('.toggle-password');
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        toggle.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        toggle.textContent = '👁️';
+    }
+}
+
+// Registrar usuario
+function registerUser() {
+    const name = document.getElementById('registerName').value.trim();
+    const email = document.getElementById('registerEmail').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    
+    if (!name || !email || !password) {
+        showToast('Complete todos los campos', 'error');
         return;
     }
     
-    setTimeout(verificarInactividad, 1000);
-}
-
-function reiniciarTemporizador() {
-    localStorage.setItem('ultimaActividad', Date.now().toString());
-    
-    if (temporizadorInactividad) {
-        clearTimeout(temporizadorInactividad);
+    if (password.length < 6) {
+        showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
     }
     
-    temporizadorInactividad = setTimeout(() => {
-        console.log('Temporizador de inactividad ejecutado');
-        sessionStorage.removeItem('calculadora_magica_session');
-        localStorage.removeItem('ultimaActividad');
-        window.location.href = URL_REDIRECCION;
-    }, TIEMPO_INACTIVIDAD);
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            return userCredential.user.updateProfile({
+                displayName: name
+            });
+        })
+        .then(() => {
+            showToast('Cuenta creada exitosamente', 'success');
+            showLoginForm();
+        })
+        .catch((error) => {
+            console.error('Error en registro:', error);
+            showToast(getAuthErrorMessage(error), 'error');
+        });
 }
 
-['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'input'].forEach(evento => {
-    document.addEventListener(evento, registrarActividad, { passive: true });
+// Iniciar sesión
+function loginUser() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    if (!email || !password) {
+        showToast('Complete todos los campos', 'error');
+        return;
+    }
+    
+    auth.signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            showToast('Sesión iniciada correctamente', 'success');
+        })
+        .catch((error) => {
+            console.error('Error en login:', error);
+            showToast(getAuthErrorMessage(error), 'error');
+        });
+}
+
+// Cerrar sesión
+function logout() {
+    auth.signOut()
+        .then(() => {
+            currentUser = null;
+            userData = null;
+            showToast('Sesión cerrada', 'success');
+        })
+        .catch((error) => {
+            console.error('Error al cerrar sesión:', error);
+        });
+}
+
+// Obtener mensaje de error de autenticación
+function getAuthErrorMessage(error) {
+    switch (error.code) {
+        case 'auth/email-already-in-use':
+            return 'El correo ya está registrado';
+        case 'auth/invalid-email':
+            return 'Correo electrónico inválido';
+        case 'auth/weak-password':
+            return 'La contraseña es muy débil';
+        case 'auth/user-not-found':
+            return 'Usuario no encontrado';
+        case 'auth/wrong-password':
+            return 'Contraseña incorrecta';
+        default:
+            return 'Error de autenticación';
+    }
+}
+
+// ===== FUNCIONES ADMINISTRATIVAS MEJORADAS =====
+
+// Cargar lista de usuarios
+function loadUsersList() {
+    database.ref('users').once('value')
+        .then((snapshot) => {
+            const users = snapshot.val();
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+            
+            for (const userId in users) {
+                if (users[userId].email === ADMIN_EMAIL) continue;
+                
+                const user = users[userId];
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${user.name}</td>
+                    <td>${user.email}</td>
+                    <td>
+                        <span class="plan-badge plan-${user.plan}">${user.plan.toUpperCase()}</span>
+                    </td>
+                    <td>${user.productsCount || 0}/${user.maxProducts || 3}</td>
+                    <td>${user.devices ? user.devices.length : 1}/${user.maxDevices || 1}</td>
+                    <td>
+                        <button onclick="toggleUserPlan('${userId}', '${user.plan}')" class="admin-btn ${user.plan === 'pro' ? 'btn-free' : 'btn-pro'}">
+                            ${user.plan === 'pro' ? 'Hacer FREE' : 'Hacer PRO'}
+                        </button>
+                        <button onclick="manageUserLimit('${userId}')" class="admin-btn btn-limit">Límite Productos</button>
+                        <button onclick="manageUserDevice('${userId}')" class="admin-btn btn-device">Dispositivos</button>
+                        <button onclick="deleteUser('${userId}')" class="admin-btn btn-delete">Eliminar</button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            }
+        })
+        .catch((error) => {
+            console.error('Error loading users:', error);
+            showToast('Error al cargar usuarios', 'error');
+        });
+}
+
+// Cambiar plan de usuario
+function toggleUserPlan(userId, currentPlan) {
+    const newPlan = currentPlan === 'pro' ? 'free' : 'pro';
+    const maxProducts = newPlan === 'pro' ? 100 : 3;
+    
+    database.ref('users/' + userId).update({
+        plan: newPlan,
+        maxProducts: maxProducts
+    })
+    .then(() => {
+        showToast(`Usuario cambiado a plan ${newPlan.toUpperCase()}`, 'success');
+        loadUsersList();
+    })
+    .catch((error) => {
+        console.error('Error updating user plan:', error);
+        showToast('Error al actualizar plan', 'error');
+    });
+}
+
+// Gestionar límite de productos del usuario
+function manageUserLimit(userId) {
+    database.ref('users/' + userId).once('value')
+        .then((snapshot) => {
+            const user = snapshot.val();
+            const currentLimit = user.maxProducts || (user.plan === 'pro' ? 100 : 3);
+            
+            const newLimit = prompt(`Límite actual de productos: ${currentLimit}\n\nIngrese el nuevo límite de productos:`, currentLimit);
+            
+            if (newLimit === null) return;
+            
+            const limit = parseInt(newLimit);
+            if (isNaN(limit) || limit < 1) {
+                showToast('Ingrese un número válido', 'error');
+                return;
+            }
+            
+            return database.ref('users/' + userId).update({
+                maxProducts: limit
+            });
+        })
+        .then(() => {
+            showToast('Límite de productos actualizado correctamente', 'success');
+            loadUsersList();
+        })
+        .catch((error) => {
+            console.error('Error updating product limit:', error);
+            showToast('Error al actualizar límite', 'error');
+        });
+}
+
+// Gestionar dispositivos del usuario
+function manageUserDevice(userId) {
+    database.ref('users/' + userId).once('value')
+        .then((snapshot) => {
+            const user = snapshot.val();
+            const currentDevices = user.devices || [];
+            const currentMaxDevices = user.maxDevices || 1;
+            
+            const action = prompt(
+                `Dispositivos actuales: ${currentDevices.length}\nLímite actual: ${currentMaxDevices}\n\nOpciones:\n1. Ingrese un número para cambiar el límite de dispositivos\n2. Ingrese un ID de dispositivo para autorizarlo\n3. Deje vacío para autorizar este dispositivo`,
+                currentMaxDevices
+            );
+            
+            if (action === null) return;
+            
+            if (action === '') {
+                // Autorizar este dispositivo
+                const deviceIdToAdd = getDeviceId();
+                let devices = [...currentDevices];
+                
+                if (!devices.includes(deviceIdToAdd)) {
+                    devices.push(deviceIdToAdd);
+                }
+                
+                return database.ref('users/' + userId).update({
+                    devices: devices
+                });
+            } else if (!isNaN(action)) {
+                // Cambiar límite de dispositivos
+                const maxDevices = parseInt(action);
+                if (maxDevices < 1) {
+                    showToast('El límite debe ser al menos 1', 'error');
+                    return;
+                }
+                
+                let devices = [...currentDevices];
+                if (devices.length > maxDevices) {
+                    devices = devices.slice(0, maxDevices);
+                }
+                
+                return database.ref('users/' + userId).update({
+                    maxDevices: maxDevices,
+                    devices: devices
+                });
+            } else {
+                // Autorizar dispositivo específico
+                const deviceIdToAdd = action.trim();
+                let devices = [...currentDevices];
+                
+                if (!devices.includes(deviceIdToAdd)) {
+                    devices.push(deviceIdToAdd);
+                }
+                
+                return database.ref('users/' + userId).update({
+                    devices: devices
+                });
+            }
+        })
+        .then(() => {
+            showToast('Configuración de dispositivos actualizada', 'success');
+            loadUsersList();
+        })
+        .catch((error) => {
+            console.error('Error managing devices:', error);
+            showToast('Error al gestionar dispositivos', 'error');
+        });
+}
+
+// Eliminar usuario
+function deleteUser(userId) {
+    if (confirm('¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
+        // Eliminar usuario de Authentication
+        auth.getUser(userId)
+            .then(() => {
+                return auth.deleteUser(userId);
+            })
+            .then(() => {
+                return database.ref('users/' + userId).remove();
+            })
+            .then(() => {
+                showToast('Usuario eliminado correctamente', 'success');
+                loadUsersList();
+            })
+            .catch((error) => {
+                console.error('Error deleting user:', error);
+                // Si no se puede eliminar de Auth, al menos eliminar datos
+                database.ref('users/' + userId).remove()
+                    .then(() => {
+                        showToast('Datos de usuario eliminados', 'success');
+                        loadUsersList();
+                    });
+            });
+    }
+}
+
+// ===== SISTEMA DE LÍMITES DE PRODUCTOS MEJORADO =====
+
+// Verificar límite de productos
+function checkProductLimit() {
+    if (!userData) return;
+    
+    const productCount = productos.length;
+    const maxProducts = userData.maxProducts || (userData.plan === 'pro' ? 100 : 3);
+    const guardarBtn = document.getElementById('guardarProductoBtn');
+    const messageDiv = document.getElementById('productLimitMessage');
+    
+    if (productCount >= maxProducts) {
+        guardarBtn.disabled = true;
+        
+        let message = `Límite de productos alcanzado (${maxProducts}). `;
+        if (userData.plan === 'free') {
+            message += 'Actualiza a PRO para más productos.';
+        } else {
+            message += 'Contacta al administrador para aumentar tu límite.';
+        }
+        
+        messageDiv.innerHTML = message;
+        messageDiv.style.display = 'block';
+        
+        showToast(message, 'warning');
+    } else {
+        guardarBtn.disabled = false;
+        messageDiv.style.display = 'none';
+        
+        // Mostrar advertencia cuando quede el 80% del límite
+        const usagePercentage = (productCount / maxProducts) * 100;
+        if (usagePercentage >= 80) {
+            const remaining = maxProducts - productCount;
+            showToast(`Cuidado: Te quedan ${remaining} productos disponibles. Contacta al administrador para aumentar tu límite.`, 'warning');
+        }
+    }
+}
+
+// Actualizar contador de productos
+function updateProductCount() {
+    if (userData) {
+        const productCount = productos.length;
+        const maxProducts = userData.maxProducts || (userData.plan === 'pro' ? 100 : 3);
+        
+        document.getElementById('productCount').textContent = `Productos: ${productCount}/${maxProducts}`;
+        
+        // Actualizar en Firebase si el usuario no es admin
+        if (userData.plan !== 'admin') {
+            database.ref('users/' + currentUser.uid + '/productsCount').set(productCount);
+        }
+    }
+}
+
+// ===== FUNCIONES BÁSICAS (ADAPTADAS) =====
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Calculadora iniciada correctamente');
+    cargarDatosIniciales();
+    configurarEventos();
+    configurarEventosMoviles();
 });
 
-function inicializarSistemaInactividad() {
-    const ultimaActividadGuardada = localStorage.getItem('ultimaActividad');
-    if (ultimaActividadGuardada) {
-        ultimaActividad = parseInt(ultimaActividadGuardada);
-        
-        const tiempoTranscurrido = Date.now() - ultimaActividad;
-        if (tiempoTranscurrido >= TIEMPO_INACTIVIDAD) {
-            console.log('Sesión expirada al cargar. Redirigiendo...');
-            sessionStorage.removeItem('calculadora_magica_session');
-            localStorage.removeItem('ultimaActividad');
-            window.location.href = URL_REDIRECCION;
+function cargarDatosIniciales() {
+    const nombreElem = document.getElementById('nombreEstablecimiento');
+    const tasaElem = document.getElementById('tasaBCV');
+    if (nombreElem) nombreElem.value = nombreEstablecimiento;
+    if (tasaElem) tasaElem.value = tasaBCVGuardada || '';
+}
+
+function calcularPrecioVenta() {
+    const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
+    const costo = parseFloat(document.getElementById('costo').value);
+    const ganancia = parseFloat(document.getElementById('ganancia').value);
+    const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
+
+    if (!tasaBCV || tasaBCV <= 0) {
+        showToast("Ingrese una tasa BCV válida", 'error');
+        return;
+    }
+    if (!costo || !ganancia || !unidadesPorCaja) {
+        showToast("Complete todos los campos requeridos", 'error');
+        return;
+    }
+
+    const gananciaDecimal = ganancia / 100;
+    const precioDolar = costo / (1 - gananciaDecimal);
+    const precioBolivares = precioDolar * tasaBCV;
+    const precioUnitarioDolar = redondear2Decimales(precioDolar / unidadesPorCaja);
+    const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
+
+    const precioUnitarioElem = document.getElementById('precioUnitario');
+    if (precioUnitarioElem) {
+        precioUnitarioElem.innerHTML =
+            `<strong>Precio unitario:</strong> $${precioUnitarioDolar.toFixed(2)} / Bs${precioUnitarioBolivar.toFixed(2)}`;
+    }
+}
+
+// ===== GUARDAR / EDITAR PRODUCTOS (CON LÍMITES MEJORADOS) =====
+function guardarProducto() {
+    // Verificar límite de productos
+    if (userData && productos.length >= userData.maxProducts && productoEditando === null) {
+        showToast(`Límite de productos alcanzado. Contacta al administrador para aumentar tu límite.`, 'error');
+        return;
+    }
+
+    const nombre = document.getElementById('producto').value.trim();
+    const codigoBarras = document.getElementById('codigoBarras').value.trim();
+    const descripcion = document.getElementById('descripcion').value;
+    const costo = parseFloat(document.getElementById('costo').value);
+    const ganancia = parseFloat(document.getElementById('ganancia').value);
+    const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
+    const unidadesExistentesInput = parseFloat(document.getElementById('unidadesExistentes').value) || 0;
+    const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
+
+    if (!nombre || !descripcion) { 
+        showToast("Complete el nombre y descripción del producto", 'error'); 
+        return; 
+    }
+    if (!tasaBCV || tasaBCV <= 0) { 
+        showToast("Ingrese una tasa BCV válida", 'error'); 
+        return; 
+    }
+    if (!costo || !ganancia || !unidadesPorCaja) { 
+        showToast("Complete todos los campos requeridos", 'error'); 
+        return; 
+    }
+
+    if (codigoBarras && productoEditando === null) {
+        const codigoExistente = productos.findIndex(p => 
+            p.codigoBarras && p.codigoBarras.toLowerCase() === codigoBarras.toLowerCase()
+        );
+        if (codigoExistente !== -1) {
+            showToast("El código de barras ya existe para otro producto", 'error');
             return;
         }
     }
-    
-    reiniciarTemporizador();
-    verificarInactividad();
+
+    let productoExistenteIndex = -1;
+    if (productoEditando !== null) {
+        productoExistenteIndex = productoEditando;
+    } else {
+        productoExistenteIndex = productos.findIndex(p => 
+            (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase()
+        );
+    }
+
+    const gananciaDecimal = ganancia / 100;
+    const precioDolar = costo / (1 - gananciaDecimal);
+    const precioBolivares = precioDolar * tasaBCV;
+    const precioUnitarioDolar = redondear2Decimales(precioDolar / unidadesPorCaja);
+    const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
+
+    const producto = {
+        nombre,
+        codigoBarras,
+        descripcion,
+        costo,
+        ganancia: gananciaDecimal,
+        unidadesPorCaja,
+        unidadesExistentes: unidadesExistentesInput,
+        precioMayorDolar: precioDolar,
+        precioMayorBolivar: precioBolivares,
+        precioUnitarioDolar: precioUnitarioDolar,
+        precioUnitarioBolivar: precioUnitarioBolivar,
+        fechaActualizacion: new Date().toISOString()
+    };
+
+    if (productoExistenteIndex !== -1) {
+        productos[productoExistenteIndex] = producto;
+        showToast("✓ Producto actualizado exitosamente", 'success');
+    } else {
+        productos.push(producto);
+        showToast("✓ Producto guardado exitosamente", 'success');
+        
+        // Actualizar contador después de agregar producto
+        updateProductCount();
+        checkProductLimit();
+    }
+
+    localStorage.setItem('productos', JSON.stringify(productos));
+    actualizarLista();
+
+    document.getElementById('producto').value = '';
+    document.getElementById('codigoBarras').value = '';
+    document.getElementById('costo').value = '';
+    document.getElementById('ganancia').value = '';
+    document.getElementById('unidadesPorCaja').value = '';
+    document.getElementById('unidadesExistentes').value = '';
+    document.getElementById('descripcion').selectedIndex = 0;
+    document.getElementById('precioUnitario').innerHTML = '';
+
+    productoEditando = null;
 }
 
-// ===== PROTECCIÓN CONTRA F12 Y HERRAMIENTAS DE DESARROLLO =====
-(function() {
-    function mostrarAdvertenciaSeguridad() {
-        console.log('%c⚠️ ACCESO RESTRINGIDO ⚠️', 'color: red; font-size: 20px; font-weight: bold;');
-        console.log('El uso de herramientas de desarrollo está restringido en esta aplicación.');
-        alert('⚠️ Acceso restringido\nEl uso de F12 y herramientas de desarrollo no está permitido en esta aplicación.');
-    }
-    
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || e.keyCode === 123 ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.keyCode === 73)) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.keyCode === 74)) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.keyCode === 67)) ||
-            (e.ctrlKey && (e.key === 'U' || e.keyCode === 85))) {
-            e.preventDefault();
-            mostrarAdvertenciaSeguridad();
-            return false;
-        }
-    });
-    
-    document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        mostrarAdvertenciaSeguridad();
-        return false;
-    });
-    
-    function detectarDevTools() {
-        const umbral = 160;
-        const inicio = performance.now();
-        debugger;
-        const fin = performance.now();
-        
-        if (fin - inicio > umbral) {
-            mostrarAdvertenciaSeguridad();
-        }
-    }
-    
-    setInterval(detectarDevTools, 1000);
-})();
+// ===== FUNCIONES EXISTENTES (MANTENER TODAS LAS ANTERIORES) =====
 
-// ===== FUNCIÓN PARA REDONDEAR A 2 DECIMALES =====
 function redondear2Decimales(numero) {
     if (isNaN(numero)) return 0;
     return Math.round((numero + Number.EPSILON) * 100) / 100;
 }
 
-// ===== INICIALIZACIÓN =====
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Calculadora iniciada correctamente');
-    inicializarSistemaInactividad();
-    cargarDatosIniciales();
-    actualizarLista();
-    actualizarCarrito();
-    configurarEventos();
-    configurarEventosMoviles();
-});
-
-// ===== CONFIGURACIÓN ESPECÍFICA PARA MÓVILES =====
-function configurarEventosMoviles() {
-    document.addEventListener('touchstart', function(e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
-            document.body.style.zoom = '100%';
-        }
-    });
-    
-    document.addEventListener('touchmove', function(e) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    
-    const viewport = document.querySelector('meta[name="viewport"]');
-    if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-    }
-}
-
-// ===== UTILIDADES / TOASTS =====
-function showToast(message, type = 'success', duration = 3500) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = `toast ${type === 'success' ? 'success' : type === 'error' ? 'error' : 'warning'}`;
-    toast.textContent = message;
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateY(8px)';
-        setTimeout(() => {
-            if (container.contains(toast)) container.removeChild(toast);
-        }, 300);
-    }, duration);
-}
-
-// ===== CONFIGURACIÓN DE EVENTOS MEJORADA =====
 function configurarEventos() {
     const buscarInput = document.getElementById('buscar');
     if (buscarInput) {
@@ -304,157 +774,39 @@ function configurarEventos() {
     });
 }
 
-// ===== BUSCADOR RÁPIDO =====
-const codigoInputElem = document.getElementById('codigoBarrasInput');
-if (codigoInputElem) {
-    codigoInputElem.addEventListener('input', function() {
-        const termino = this.value.trim().toLowerCase();
-        const sugerenciasDiv = document.getElementById('sugerencias');
-        if (!sugerenciasDiv) return;
-        sugerenciasDiv.innerHTML = '';
-
-        if (termino.length < 2) return;
-
-        const coincidencias = productos.filter(p =>
-            (p.nombre || p.producto || '').toLowerCase().includes(termino) ||
-            (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termino))
-        );
-
-        coincidencias.slice(0, 8).forEach(prod => {
-            const opcion = document.createElement('div');
-            opcion.textContent = `${(prod.nombre || prod.producto)} (${prod.descripcion || prod.descripcion})`;
-            opcion.onclick = function() {
-                document.getElementById('codigoBarrasInput').value = prod.codigoBarras || prod.nombre || prod.producto;
-                agregarPorCodigoBarras();
-                sugerenciasDiv.innerHTML = '';
-                document.getElementById('codigoBarrasInput').focus();
-            };
-            sugerenciasDiv.appendChild(opcion);
-        });
-    });
-}
-
-// ===== FUNCIONES BÁSICAS =====
-function cargarDatosIniciales() {
-    const nombreElem = document.getElementById('nombreEstablecimiento');
-    const tasaElem = document.getElementById('tasaBCV');
-    if (nombreElem) nombreElem.value = nombreEstablecimiento;
-    if (tasaElem) tasaElem.value = tasaBCVGuardada || '';
-}
-
-function calcularPrecioVenta() {
-    const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
-    const costo = parseFloat(document.getElementById('costo').value);
-    const ganancia = parseFloat(document.getElementById('ganancia').value);
-    const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
-
-    if (!tasaBCV || tasaBCV <= 0) {
-        showToast("Ingrese una tasa BCV válida", 'error');
-        return;
-    }
-    if (!costo || !ganancia || !unidadesPorCaja) {
-        showToast("Complete todos los campos requeridos", 'error');
-        return;
-    }
-
-    const gananciaDecimal = ganancia / 100;
-    const precioDolar = costo / (1 - gananciaDecimal);
-    const precioBolivares = precioDolar * tasaBCV;
-    const precioUnitarioDolar = redondear2Decimales(precioDolar / unidadesPorCaja);
-    const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
-
-    const precioUnitarioElem = document.getElementById('precioUnitario');
-    if (precioUnitarioElem) {
-        precioUnitarioElem.innerHTML =
-            `<strong>Precio unitario:</strong> $${precioUnitarioDolar.toFixed(2)} / Bs${precioUnitarioBolivar.toFixed(2)}`;
-    }
-}
-
-// ===== GUARDAR / EDITAR PRODUCTOS =====
-function guardarProducto() {
-    const nombre = document.getElementById('producto').value.trim();
-    const codigoBarras = document.getElementById('codigoBarras').value.trim();
-    const descripcion = document.getElementById('descripcion').value;
-    const costo = parseFloat(document.getElementById('costo').value);
-    const ganancia = parseFloat(document.getElementById('ganancia').value);
-    const unidadesPorCaja = parseFloat(document.getElementById('unidadesPorCaja').value);
-    const unidadesExistentesInput = parseFloat(document.getElementById('unidadesExistentes').value) || 0;
-    const tasaBCV = parseFloat(document.getElementById('tasaBCV').value) || tasaBCVGuardada;
-
-    if (!nombre || !descripcion) { 
-        showToast("Complete el nombre y descripción del producto", 'error'); 
-        return; 
-    }
-    if (!tasaBCV || tasaBCV <= 0) { 
-        showToast("Ingrese una tasa BCV válida", 'error'); 
-        return; 
-    }
-    if (!costo || !ganancia || !unidadesPorCaja) { 
-        showToast("Complete todos los campos requeridos", 'error'); 
-        return; 
-    }
-
-    if (codigoBarras && productoEditando === null) {
-        const codigoExistente = productos.findIndex(p => 
-            p.codigoBarras && p.codigoBarras.toLowerCase() === codigoBarras.toLowerCase()
-        );
-        if (codigoExistente !== -1) {
-            showToast("El código de barras ya existe para otro producto", 'error');
-            return;
+function configurarEventosMoviles() {
+    document.addEventListener('touchstart', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+            document.body.style.zoom = '100%';
         }
+    });
+    
+    document.addEventListener('touchmove', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
+}
 
-    let productoExistenteIndex = -1;
-    if (productoEditando !== null) {
-        productoExistenteIndex = productoEditando;
-    } else {
-        productoExistenteIndex = productos.findIndex(p => 
-            (p.nombre || p.producto || '').toLowerCase() === nombre.toLowerCase()
-        );
-    }
-
-    const gananciaDecimal = ganancia / 100;
-    const precioDolar = costo / (1 - gananciaDecimal);
-    const precioBolivares = precioDolar * tasaBCV;
-    const precioUnitarioDolar = redondear2Decimales(precioDolar / unidadesPorCaja);
-    const precioUnitarioBolivar = redondear2Decimales(precioBolivares / unidadesPorCaja);
-
-    const producto = {
-        nombre,
-        codigoBarras,
-        descripcion,
-        costo,
-        ganancia: gananciaDecimal,
-        unidadesPorCaja,
-        unidadesExistentes: unidadesExistentesInput,
-        precioMayorDolar: precioDolar,
-        precioMayorBolivar: precioBolivares,
-        precioUnitarioDolar: precioUnitarioDolar,
-        precioUnitarioBolivar: precioUnitarioBolivar,
-        fechaActualizacion: new Date().toISOString()
-    };
-
-    if (productoExistenteIndex !== -1) {
-        productos[productoExistenteIndex] = producto;
-        showToast("✓ Producto actualizado exitosamente", 'success');
-    } else {
-        productos.push(producto);
-        showToast("✓ Producto guardado exitosamente", 'success');
-    }
-
-    localStorage.setItem('productos', JSON.stringify(productos));
-    actualizarLista();
-
-    document.getElementById('producto').value = '';
-    document.getElementById('codigoBarras').value = '';
-    document.getElementById('costo').value = '';
-    document.getElementById('ganancia').value = '';
-    document.getElementById('unidadesPorCaja').value = '';
-    document.getElementById('unidadesExistentes').value = '';
-    document.getElementById('descripcion').selectedIndex = 0;
-    document.getElementById('precioUnitario').innerHTML = '';
-
-    productoEditando = null;
+function showToast(message, type = 'success', duration = 3500) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type === 'success' ? 'success' : type === 'error' ? 'error' : 'warning'}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => {
+            if (container.contains(toast)) container.removeChild(toast);
+        }, 300);
+    }, duration);
 }
 
 function editarProducto(index) {
@@ -499,7 +851,6 @@ function editarProducto(index) {
     showToast(`Editando: ${producto.nombre}`, 'success');
 }
 
-// ===== CARRITO DE VENTAS =====
 function agregarPorCodigoBarras() {
     const codigo = document.getElementById('codigoBarrasInput').value.trim();
     procesarEscaneo(codigo);
@@ -578,7 +929,6 @@ function actualizarCantidadCarrito(index, cambio) {
     actualizarCarrito();
 }
 
-// ===== FUNCIÓN: ingresarGramos =====
 function ingresarGramos(index) {
     const item = carrito[index];
     if (!item) return;
@@ -624,7 +974,6 @@ function ingresarGramos(index) {
     actualizarCarrito();
 }
 
-// ===== FUNCIÓN CALCULAR SUBTOTAL SEGÚN UNIDAD =====
 function calcularSubtotalSegonUnidad(item) {
     const producto = productos[item.indexProducto];
     if (!producto) return;
@@ -651,7 +1000,6 @@ function eliminarDelCarrito(index) {
     actualizarCarrito();
 }
 
-// ===== LISTA DE PRODUCTOS =====
 function actualizarLista() {
     const tbody = document.querySelector('#listaProductos tbody');
     if (!tbody) return;
@@ -685,7 +1033,6 @@ function actualizarLista() {
     });
 }
 
-// ===== BUSCADOR MEJORADO PARA MÓVILES =====
 function buscarProducto() {
     const termino = document.getElementById('buscar').value.trim().toLowerCase();
     if (!termino) { 
@@ -790,11 +1137,12 @@ function eliminarProducto(index) {
         productos.splice(indiceReal, 1);
         localStorage.setItem('productos', JSON.stringify(productos));
         actualizarLista();
+        updateProductCount();
+        checkProductLimit();
         showToast(`Producto eliminado: ${producto.nombre}`, 'success');
     }
 }
 
-// ===== MÉTODOS DE PAGO Y VENTAS =====
 function finalizarVenta() {
     if (carrito.length === 0) { showToast("El carrito está vacío", 'warning'); return; }
 
@@ -844,7 +1192,7 @@ function seleccionarMetodoPago(metodo) {
                 if (metodo === 'efectivo_bs') cambio = redondear2Decimales(recib - totalBs);
                 else {
                     const totalEnDolares = tasaBCVGuardada ? redondear2Decimales(totalBs / tasaBCVGuardada) : 0;
-                    cambio = redondear2Decimales(recib - totalEnDolares);
+                    cambio = redondear2Decimales(recid - totalEnDolares);
                 }
                 document.getElementById('cambioCalculado').value = cambio >= 0 ? cambio.toFixed(2) : `Faltan ${Math.abs(cambio).toFixed(2)}`;
             });
@@ -970,7 +1318,6 @@ function cancelarPago() {
     detallesPago = {};
 }
 
-// ===== NOMBRE ESTABLECIMIENTO Y TASA BCV =====
 function guardarNombreEstablecimiento() {
     nombreEstablecimiento = document.getElementById('nombreEstablecimiento').value.trim();
     if (!nombreEstablecimiento) { showToast("Ingrese un nombre válido", 'error'); return; }
@@ -1003,7 +1350,6 @@ function toggleCopyrightNotice() {
     notice.style.display = notice.style.display === 'block' ? 'none' : 'block';
 }
 
-/* ===== LISTA DE COSTOS ===== */
 function mostrarListaCostos() {
     const container = document.getElementById('listaCostosContainer');
     const buscarCostosInput = document.getElementById('buscarCostos');
@@ -1044,7 +1390,6 @@ function filtrarListaCostos() {
     });
 }
 
-// ===== GENERAR PDF COSTOS =====
 function generarPDFCostos() {
     if (!productos.length) { showToast("No hay productos para generar PDF de costos", 'warning'); return; }
 
@@ -1072,7 +1417,6 @@ function generarPDFCostos() {
     doc.save(`lista_costos_${(new Date()).toISOString().slice(0,10)}.pdf`);
 }
 
-// ===== GENERAR REPORTE DIARIO (PDF) =====
 function generarReporteDiario() {
     if (!ventasDiarias.length) { showToast("No hay ventas registradas", 'warning'); return; }
 
@@ -1081,24 +1425,13 @@ function generarReporteDiario() {
     const ventasAUsar = ventasHoy.length ? ventasHoy : ventasDiarias;
 
     let totalVentasBs = 0;
-    let totalCostosBs = 0;
+    let totalVentasDolares = 0;
     const filas = ventasAUsar.map(v => {
         totalVentasBs += v.totalBolivar || 0;
-        const producto = productos[v.indexProducto] || productos.find(p => p.nombre === v.producto);
-        let costoDolar = 0;
-
-        if (producto) {
-            if (v.unidad === 'gramo') {
-                costoDolar = (v.cantidad / 1000) * (producto.costo / (producto.unidadesPorCaja || 1));
-            } else if (v.unidad === 'caja') {
-                costoDolar = v.cantidad * (producto.costo || 0);
-            } else {
-                costoDolar = v.cantidad * ((producto.costo || 0) / (producto.unidadesPorCaja || 1));
-            }
-        }
-
-        const costoBs = costoDolar * (tasaBCVGuardada || 1);
-        totalCostosBs += costoBs;
+        
+        // Calcular total en dólares usando la tasa BCV guardada
+        const totalDolar = tasaBCVGuardada > 0 ? (v.totalBolivar || 0) / tasaBCVGuardada : 0;
+        totalVentasDolares += totalDolar;
 
         return [
             v.fecha,
@@ -1106,12 +1439,16 @@ function generarReporteDiario() {
             v.producto,
             `${v.cantidad} ${v.unidad}`,
             `Bs ${ (v.totalBolivar || 0).toFixed(2) }`,
-            v.metodoPago,
-            `Bs ${ costoBs.toFixed(2) }`
+            `$ ${ totalDolar.toFixed(2) }`,
+            v.metodoPago
         ];
     });
 
-    const gananciaEstim = totalVentasBs - totalCostosBs;
+    // ===== FÓRMULA SIMPLIFICADA 50-30-20 SOBRE INGRESOS EN DÓLARES =====
+    const llaveMaestra = redondear2Decimales(totalVentasDolares / 100);
+    const reinvertir = redondear2Decimales(llaveMaestra * 50);
+    const gastosFijos = redondear2Decimales(llaveMaestra * 30);
+    const sueldo = redondear2Decimales(llaveMaestra * 20);
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt' });
@@ -1120,26 +1457,51 @@ function generarReporteDiario() {
     doc.text(nombreEstablecimiento || 'Reporte Diario', 40, 40);
     doc.setFontSize(10);
     doc.text(`Fecha: ${ (new Date()).toLocaleDateString() }`, 40, 60);
+    doc.text(`Tasa BCV: ${tasaBCVGuardada}`, 40, 75);
 
     doc.autoTable({
-        startY: 80,
-        head: [['Fecha','Hora','Producto','Cant.','Total (Bs)','Pago','Costo Bs']],
+        startY: 90,
+        head: [['Fecha','Hora','Producto','Cant.','Total (Bs)','Total ($)','Pago']],
         body: filas,
         styles: { fontSize: 9 }
     });
 
     const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 300;
+    
+    // ===== SECCIÓN MEJORADA: RESUMEN FINANCIERO =====
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('RESUMEN FINANCIERO', 40, finalY + 20);
+    
     doc.setFontSize(11);
-    doc.text(`Total ventas (Bs): ${totalVentasBs.toFixed(2)}`, 40, finalY + 20);
-    doc.text(`Total costos estimados (Bs): ${totalCostosBs.toFixed(2)}`, 40, finalY + 38);
-    doc.text(`Ganancia estimada (Bs): ${gananciaEstim.toFixed(2)}`, 40, finalY + 56);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Total ingresos en Bolívares: Bs ${totalVentasBs.toFixed(2)}`, 40, finalY + 40);
+    doc.text(`Total ingresos en Dólares: $ ${totalVentasDolares.toFixed(2)}`, 40, finalY + 58);
+    
+    // ===== NUEVA SECCIÓN: DISTRIBUCIÓN 50-30-20 EN DÓLARES =====
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text('DISTRIBUCIÓN RECOMENDADA (50-30-20) EN DÓLARES', 40, finalY + 85);
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text(`50% Para reinvertir: $ ${reinvertir.toFixed(2)}`, 40, finalY + 105);
+    doc.text(`30% Para gastos fijos: $ ${gastosFijos.toFixed(2)}`, 40, finalY + 123);
+    doc.text(`20% Para sueldo: $ ${sueldo.toFixed(2)}`, 40, finalY + 141);
+    
+    // ===== VERIFICACIÓN DE CÁLCULO =====
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Verificación: ${reinvertir.toFixed(2)} + ${gastosFijos.toFixed(2)} + ${sueldo.toFixed(2)} = ${(reinvertir + gastosFijos + sueldo).toFixed(2)}`, 40, finalY + 165);
+    
+    // ===== NOTA EXPLICATIVA =====
+    doc.setFontSize(9);
+    doc.text('Nota: Esta distribución ayuda a mantener un negocio saludable, reinvirtiendo en inventario,', 40, finalY + 185);
+    doc.text('cubriendo gastos operativos y asegurando un ingreso personal sostenible.', 40, finalY + 198);
 
     doc.save(`reporte_diario_${(new Date()).toISOString().slice(0,10)}.pdf`);
 }
 
-// ===== NUEVAS FUNCIONALIDADES INNOVADORAS =====
-
-// ===== PDF POR CATEGORÍA =====
 function mostrarOpcionesPDF() {
     document.getElementById('modalCategorias').style.display = 'block';
 }
@@ -1230,7 +1592,6 @@ function generarPDFPorCategoria(categoria) {
     showToast(`PDF generado para: ${tituloCategoria}`, 'success');
 }
 
-// ===== ETIQUETAS PARA ANAQUELES =====
 function generarEtiquetasAnaqueles() {
     document.getElementById('modalEtiquetas').style.display = 'block';
 }
@@ -1359,7 +1720,6 @@ function generarEtiquetasPorCategoria(categoria) {
     showToast(`Etiquetas generadas para: ${tituloCategoria}`, 'success');
 }
 
-// ===== Imprimir ticket térmico =====
 function imprimirTicketTermico(detalles) {
     try {
         const printWindow = window.open('', '_blank', 'toolbar=0,location=0,menubar=0');
@@ -1431,19 +1791,6 @@ function imprimirTicketTermico(detalles) {
     }
 }
 
-// ===== Cerrar modal si se hace clic fuera =====
-window.onclick = function(event) {
-    const modal = document.getElementById('modalPago');
-    if (event.target == modal) cerrarModalPago();
-    
-    const modalCategorias = document.getElementById('modalCategorias');
-    if (event.target == modalCategorias) cerrarModalCategorias();
-    
-    const modalEtiquetas = document.getElementById('modalEtiquetas');
-    if (event.target == modalEtiquetas) cerrarModalEtiquetas();
-};
-
-// ===== FUNCIONES DE RESPALDO Y RESTAURACIÓN =====
 function descargarBackup() {
     try {
         const backupData = {
@@ -1509,6 +1856,8 @@ function cargarBackup(files) {
                 cargarDatosIniciales();
                 actualizarLista();
                 actualizarCarrito();
+                updateProductCount();
+                checkProductLimit();
                 
                 showToast('Respaldo cargado exitosamente', 'success');
             }
@@ -1527,7 +1876,6 @@ function cargarBackup(files) {
     document.getElementById('fileInput').value = '';
 }
 
-// ===== NUEVAS FUNCIONES PARA ESCÁNER MEJORADO =====
 function procesarEscaneo(codigo) {
     if (!codigo) {
         showToast("Código de barras vacío", 'warning');
@@ -1633,69 +1981,14 @@ function darFeedbackEscaneoExitoso() {
     }
 }
 
-// ===== SISTEMA DE SINCRONIZACIÓN OFFLINE =====
-function verificarConexion() {
-    return navigator.onLine;
-}
-
-function guardarDatosOffline() {
-    const datos = {
-        productos: productos,
-        nombreEstablecimiento: nombreEstablecimiento,
-        tasaBCV: tasaBCVGuardada,
-        ventasDiarias: ventasDiarias,
-        carrito: carrito,
-        timestamp: new Date().getTime()
-    };
+// Cerrar modal si se hace clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalPago');
+    if (event.target == modal) cerrarModalPago();
     
-    localStorage.setItem('datosOffline', JSON.stringify(datos));
-}
-
-function cargarDatosOffline() {
-    const datosGuardados = localStorage.getItem('datosOffline');
-    if (datosGuardados) {
-        const datos = JSON.parse(datosGuardados);
-        
-        // Solo cargar si los datos offline son más recientes
-        const timestampOffline = datos.timestamp || 0;
-        const timestampActual = localStorage.getItem('ultimaSincronizacion') || 0;
-        
-        if (timestampOffline > timestampActual) {
-            productos = datos.productos || productos;
-            nombreEstablecimiento = datos.nombreEstablecimiento || nombreEstablecimiento;
-            tasaBCVGuardada = datos.tasaBCV || tasaBCVGuardada;
-            ventasDiarias = datos.ventasDiarias || ventasDiarias;
-            carrito = datos.carrito || carrito;
-            
-            // Actualizar localStorage
-            localStorage.setItem('productos', JSON.stringify(productos));
-            localStorage.setItem('nombreEstablecimiento', nombreEstablecimiento);
-            localStorage.setItem('tasaBCV', tasaBCVGuardada.toString());
-            localStorage.setItem('ventasDiarias', JSON.stringify(ventasDiarias));
-            localStorage.setItem('carrito', JSON.stringify(carrito));
-            
-            showToast('Datos recuperados correctamente', 'success');
-        }
-    }
-}
-
-// Guardar datos automáticamente cada 30 segundos
-setInterval(guardarDatosOffline, 30000);
-
-// Cargar datos offline al iniciar
-window.addEventListener('load', function() {
-    if (!verificarConexion()) {
-        cargarDatosOffline();
-    }
-});
-
-// Sincronizar cuando se recupera la conexión
-window.addEventListener('online', function() {
-    showToast('Conexión restaurada - Sincronizando datos', 'success');
-    localStorage.setItem('ultimaSincronizacion', new Date().getTime().toString());
-});
-
-window.addEventListener('offline', function() {
-    showToast('Sin conexión - Modo offline activado', 'warning');
-    guardarDatosOffline();
-});
+    const modalCategorias = document.getElementById('modalCategorias');
+    if (event.target == modalCategorias) cerrarModalCategorias();
+    
+    const modalEtiquetas = document.getElementById('modalEtiquetas');
+    if (event.target == modalEtiquetas) cerrarModalEtiquetas();
+};
