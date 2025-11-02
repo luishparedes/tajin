@@ -1,13 +1,5 @@
-// ===== CONFIGURACIÓN FIREBASE =====
-const firebaseConfig = {
-    apiKey: "AIzaSyAKR4EVDjVV944_jZg_8vGu9Ge7mIxMK4g",
-    authDomain: "magicaservidor.firebaseapp.com",
-    projectId: "magicaservidor",
-    storageBucket: "magicaservidor.firebasestorage.app",
-    messagingSenderId: "842627626709",
-    appId: "1:842627626709:web:794726b1d35317af81145c",
-    databaseURL: "https://magicaservidor-default-rtdb.firebaseio.com/"
-};
+// ===== CONFIGURACIÓN FIREBASE SEGURA =====
+// La configuración está en config.js (archivo privado)
 
 // Inicializar Firebase
 firebase.initializeApp(firebaseConfig);
@@ -34,7 +26,7 @@ const ADMIN_EMAIL = "luishparedes94@gmail.com";
 let tiempoUltimaTecla = 0;
 let bufferEscaneo = '';
 
-// ===== FUNCIONES DE AUTENTICACIÓN MEJORADAS =====
+// ===== SISTEMA DE AUTENTICACIÓN MEJORADO =====
 
 // Verificar estado de autenticación
 auth.onAuthStateChanged((user) => {
@@ -63,19 +55,33 @@ function loadUserData(userId) {
         });
 }
 
-// Crear datos de usuario
+// Crear datos de usuario (CORREGIDO - NOMBRE REAL)
 function createUserData(userId) {
     const userEmail = currentUser.email;
     const isAdmin = userEmail === ADMIN_EMAIL;
     
+    // Obtener el nombre real del formulario de registro
+    let userName = 'Usuario';
+    const registerNameInput = document.getElementById('registerName');
+    
+    if (registerNameInput && registerNameInput.value.trim() !== '') {
+        userName = registerNameInput.value.trim();
+    } else if (currentUser.displayName) {
+        userName = currentUser.displayName;
+    } else {
+        // Extraer nombre del email como última opción
+        userName = userEmail.split('@')[0];
+        userName = userName.charAt(0).toUpperCase() + userName.slice(1);
+    }
+    
     userData = {
-        name: currentUser.displayName || 'Usuario',
+        name: userName,
         email: userEmail,
         plan: isAdmin ? 'admin' : 'free',
         productsCount: 0,
         maxProducts: isAdmin ? 1000 : 3,
         devices: [getDeviceId()],
-        maxDevices: 1, // Por defecto 1 dispositivo
+        maxDevices: 1,
         createdAt: firebase.database.ServerValue.TIMESTAMP,
         lastLogin: firebase.database.ServerValue.TIMESTAMP
     };
@@ -95,7 +101,6 @@ function initializeUserSession() {
     if (userData.plan === 'admin') {
         showAdminPanel();
     } else {
-        // Verificar dispositivo autorizado
         const currentDeviceId = getDeviceId();
         const userDevices = userData.devices || [];
         const maxDevices = userData.maxDevices || 1;
@@ -106,14 +111,11 @@ function initializeUserSession() {
             return;
         }
         
-        // Verificar límite de dispositivos
         if (userDevices.length > maxDevices) {
-            // Remover dispositivos excedentes
             const allowedDevices = userDevices.slice(0, maxDevices);
             database.ref('users/' + currentUser.uid + '/devices').set(allowedDevices);
         }
         
-        // Actualizar último login
         database.ref('users/' + currentUser.uid + '/lastLogin').set(firebase.database.ServerValue.TIMESTAMP);
         
         showMainApp();
@@ -152,14 +154,15 @@ function showRegisterForm() {
     document.getElementById('registerForm').style.display = 'block';
 }
 
-// Mostrar aplicación principal
+// Mostrar aplicación principal (CORREGIDO - NOMBRE REAL)
 function showMainApp() {
     document.getElementById('authContainer').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     document.getElementById('adminPanel').style.display = 'none';
     
-    // Actualizar interfaz de usuario
-    document.getElementById('userWelcome').textContent = `Bienvenido, ${userData.name}`;
+    // MOSTRAR NOMBRE REAL DEL USUARIO
+    const userName = userData.name || 'Usuario';
+    document.getElementById('userWelcome').textContent = `Bienvenido, ${userName}`;
     document.getElementById('userPlan').textContent = userData.plan.toUpperCase();
     document.getElementById('userPlan').className = `plan-badge plan-${userData.plan}`;
     
@@ -214,8 +217,13 @@ function registerUser() {
             });
         })
         .then(() => {
-            showToast('Cuenta creada exitosamente', 'success');
+            showToast(`Cuenta creada exitosamente para ${name}`, 'success');
             showLoginForm();
+            
+            // Limpiar formulario
+            document.getElementById('registerName').value = '';
+            document.getElementById('registerEmail').value = '';
+            document.getElementById('registerPassword').value = '';
         })
         .catch((error) => {
             console.error('Error en registro:', error);
@@ -274,7 +282,7 @@ function getAuthErrorMessage(error) {
     }
 }
 
-// ===== FUNCIONES ADMINISTRATIVAS MEJORADAS =====
+// ===== FUNCIONES ADMINISTRATIVAS =====
 
 // Cargar lista de usuarios
 function loadUsersList() {
@@ -438,31 +446,19 @@ function manageUserDevice(userId) {
 // Eliminar usuario
 function deleteUser(userId) {
     if (confirm('¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {
-        // Eliminar usuario de Authentication
-        auth.getUser(userId)
-            .then(() => {
-                return auth.deleteUser(userId);
-            })
-            .then(() => {
-                return database.ref('users/' + userId).remove();
-            })
+        database.ref('users/' + userId).remove()
             .then(() => {
                 showToast('Usuario eliminado correctamente', 'success');
                 loadUsersList();
             })
             .catch((error) => {
                 console.error('Error deleting user:', error);
-                // Si no se puede eliminar de Auth, al menos eliminar datos
-                database.ref('users/' + userId).remove()
-                    .then(() => {
-                        showToast('Datos de usuario eliminados', 'success');
-                        loadUsersList();
-                    });
+                showToast('Error al eliminar usuario', 'error');
             });
     }
 }
 
-// ===== SISTEMA DE LÍMITES DE PRODUCTOS MEJORADO =====
+// ===== SISTEMA DE LÍMITES DE PRODUCTOS =====
 
 // Verificar límite de productos
 function checkProductLimit() {
@@ -485,18 +481,9 @@ function checkProductLimit() {
         
         messageDiv.innerHTML = message;
         messageDiv.style.display = 'block';
-        
-        showToast(message, 'warning');
     } else {
         guardarBtn.disabled = false;
         messageDiv.style.display = 'none';
-        
-        // Mostrar advertencia cuando quede el 80% del límite
-        const usagePercentage = (productCount / maxProducts) * 100;
-        if (usagePercentage >= 80) {
-            const remaining = maxProducts - productCount;
-            showToast(`Cuidado: Te quedan ${remaining} productos disponibles. Contacta al administrador para aumentar tu límite.`, 'warning');
-        }
     }
 }
 
