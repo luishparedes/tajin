@@ -18,19 +18,24 @@ let bufferEscaneo = '';
 (function() {
     'use strict';
     
-    // Detectar si es dispositivo móvil
+    // Detectar si es dispositivo móvil de forma más precisa
     function esDispositivoMovil() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-               window.innerWidth <= 768;
+        const userAgent = navigator.userAgent.toLowerCase();
+        const esMovil = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+        const esPantallaPequena = window.innerWidth <= 768;
+        
+        return esMovil || esPantallaPequena;
     }
     
     // Si es móvil, no activar protección
     if (esDispositivoMovil()) {
         console.log('🔓 Modo móvil: Protección F12 desactivada');
-        return; // Salir de la función, no activar protección
+        return; // Salir completamente, no activar protección
     }
     
-    console.log('🔒 Modo desktop: Protección F12 activada');
+    console.log('🔒 Modo desktop: Protección F12 activa (se activa solo con teclas)');
+    
+    let advertenciaMostrada = false;
     
     // Bloquear F12 y combinaciones de teclas (solo en desktop)
     document.addEventListener('keydown', function(e) {
@@ -73,41 +78,71 @@ let bufferEscaneo = '';
     // Bloquear clic derecho (solo en desktop)
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
-        mostrarAdvertenciaSeguridad();
+        if (!advertenciaMostrada) {
+            mostrarAdvertenciaSeguridad();
+        }
         return false;
     });
     
-    // Detectar apertura de herramientas de desarrollo (solo en desktop)
-    let devtools = function() {};
-    devtools.toString = function() {
-        mostrarAdvertenciaSeguridad();
+    // Sistema de detección de devtools MEJORADO - No se activa al inicio
+    let devtoolsAbierto = false;
+    
+    const detectorDevTools = function() {};
+    detectorDevTools.toString = function() {
+        if (!devtoolsAbierto) {
+            devtoolsAbierto = true;
+            setTimeout(() => {
+                mostrarAdvertenciaSeguridad();
+            }, 1000);
+        }
         return '';
     };
     
-    console.log('%c🔒 ACCESO RESTRINGIDO 🔒', 'color: red; font-size: 24px; font-weight: bold;');
-    console.log('El uso de herramientas de desarrollo está restringido en esta aplicación.');
-    console.log(devtools);
+    // Verificación inicial suave - no bloquea inmediatamente
+    setTimeout(() => {
+        console.log('%c🔒 SISTEMA PROTEGIDO', 'color: orange; font-size: 16px; font-weight: bold;');
+        console.log('Uso de herramientas de desarrollo restringido');
+        console.log(detectorDevTools);
+    }, 2000);
     
-    // Detectar cambios en el tamaño de la ventana (posible apertura de devtools)
+    // Detectar cambios en el tamaño de la ventana (MEJORADO)
     const threshold = 160;
+    let chequeosRealizados = 0;
+    const maxChequeos = 3; // Máximo de detecciones
+    
     const checkDevTools = function() {
+        if (chequeosRealizados >= maxChequeos) {
+            return; // Dejar de chequear después de varios intentos
+        }
+        
         const widthThreshold = window.outerWidth - window.innerWidth > threshold;
         const heightThreshold = window.outerHeight - window.innerHeight > threshold;
         
-        if (widthThreshold || heightThreshold) {
-            mostrarAdvertenciaSeguridad();
+        if ((widthThreshold || heightThreshold) && !devtoolsAbierto) {
+            chequeosRealizados++;
+            devtoolsAbierto = true;
+            setTimeout(() => {
+                mostrarAdvertenciaSeguridad();
+            }, 1500);
         }
     };
     
-    setInterval(checkDevTools, 1000);
+    // Iniciar detección después de un tiempo, no inmediatamente
+    setTimeout(() => {
+        setInterval(checkDevTools, 2000);
+    }, 3000);
     
     function mostrarAdvertenciaSeguridad() {
-        // Mostrar toast de advertencia
-        showToast('⚠️ Acceso restringido: Uso no autorizado de herramientas de desarrollo', 'error', 5000);
+        if (advertenciaMostrada) return;
         
-        // Opcional: Redirigir después de múltiples intentos
+        advertenciaMostrada = true;
+        
+        // Mostrar toast de advertencia
+        showToast('⚠️ Acceso restringido: Uso no autorizado de herramientas de desarrollo', 'error', 4000);
+        
+        // Redirigir solo después de múltiples intentos
         setTimeout(() => {
-            window.location.href = "about:blank";
+            // window.location.href = "about:blank"; // Opcional: descomentar si quieres redirección
         }, 3000);
     }
 })();
