@@ -14,11 +14,25 @@ let historialNavegacion = ['inicio']; // Historial para el botón de regreso
 let tiempoUltimaTecla = 0;
 let bufferEscaneo = '';
 
-// ===== SISTEMA DE SEGURIDAD F12 =====
+// ===== SISTEMA DE SEGURIDAD F12 (Solo en Desktop) =====
 (function() {
     'use strict';
     
-    // Bloquear F12 y combinaciones de teclas
+    // Detectar si es dispositivo móvil
+    function esDispositivoMovil() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               window.innerWidth <= 768;
+    }
+    
+    // Si es móvil, no activar protección
+    if (esDispositivoMovil()) {
+        console.log('🔓 Modo móvil: Protección F12 desactivada');
+        return; // Salir de la función, no activar protección
+    }
+    
+    console.log('🔒 Modo desktop: Protección F12 activada');
+    
+    // Bloquear F12 y combinaciones de teclas (solo en desktop)
     document.addEventListener('keydown', function(e) {
         // Bloquear F12
         if (e.key === 'F12' || e.keyCode === 123) {
@@ -56,14 +70,14 @@ let bufferEscaneo = '';
         }
     });
     
-    // Bloquear clic derecho
+    // Bloquear clic derecho (solo en desktop)
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         mostrarAdvertenciaSeguridad();
         return false;
     });
     
-    // Detectar apertura de herramientas de desarrollo
+    // Detectar apertura de herramientas de desarrollo (solo en desktop)
     let devtools = function() {};
     devtools.toString = function() {
         mostrarAdvertenciaSeguridad();
@@ -128,7 +142,6 @@ function actualizarBotonRegreso() {
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Calculadora Mágica iniciada correctamente');
-    inicializarSistemaInactividad();
     cargarDatosIniciales();
     actualizarEstadisticas();
     configurarEventos();
@@ -2070,55 +2083,6 @@ function cargarBackup(files) {
     
     document.getElementById('fileInput').value = '';
 }
-
-// ===== SISTEMA DE INACTIVIDAD =====
-const TIEMPO_INACTIVIDAD = 4 * 60 * 1000;
-const URL_REDIRECCION = "http://portal.calculadoramagica.lat/";
-
-let temporizadorInactividad;
-let ultimaActividad = Date.now();
-
-function registrarActividad() {
-    ultimaActividad = Date.now();
-    reiniciarTemporizador();
-}
-
-function inicializarSistemaInactividad() {
-    const ultimaActividadGuardada = localStorage.getItem('ultimaActividad');
-    if (ultimaActividadGuardada) {
-        ultimaActividad = parseInt(ultimaActividadGuardada);
-        
-        const tiempoTranscurrido = Date.now() - ultimaActividad;
-        if (tiempoTranscurrido >= TIEMPO_INACTIVIDAD) {
-            console.log('Sesión expirada al cargar. Redirigiendo...');
-            sessionStorage.removeItem('calculadora_magica_session');
-            localStorage.removeItem('ultimaActividad');
-            window.location.href = URL_REDIRECCION;
-            return;
-        }
-    }
-    
-    reiniciarTemporizador();
-}
-
-function reiniciarTemporizador() {
-    localStorage.setItem('ultimaActividad', Date.now().toString());
-    
-    if (temporizadorInactividad) {
-        clearTimeout(temporizadorInactividad);
-    }
-    
-    temporizadorInactividad = setTimeout(() => {
-        console.log('Temporizador de inactividad ejecutado');
-        sessionStorage.removeItem('calculadora_magica_session');
-        localStorage.removeItem('ultimaActividad');
-        window.location.href = URL_REDIRECCION;
-    }, TIEMPO_INACTIVIDAD);
-}
-
-['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'input'].forEach(evento => {
-    document.addEventListener(evento, registrarActividad, { passive: true });
-});
 
 // ===== FUNCIONES ADICIONALES =====
 function toggleCopyrightNotice() {
