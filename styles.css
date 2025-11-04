@@ -107,6 +107,35 @@ body {
     background-color: rgba(0,0,0,0.04);
 }
 
+/* Botón de regreso para móviles */
+.back-button-mobile {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(66, 133, 244, 0.4);
+    z-index: 999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.back-button-mobile:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(66, 133, 244, 0.6);
+}
+
+.back-button-mobile.visible {
+    display: flex;
+}
+
 /* Barra lateral */
 .sidebar {
     position: fixed;
@@ -533,6 +562,7 @@ body {
 
 .scanner-section {
     margin-bottom: 24px;
+    position: relative;
 }
 
 .scanner-input {
@@ -997,6 +1027,7 @@ body {
     min-height: 60px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
 }
 
 .sugerencia-item:hover {
@@ -1079,6 +1110,42 @@ body {
     color: white;
 }
 
+/* Botón MAS para gramos */
+.btn-mas-gramos {
+    background: var(--warning-color);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s;
+    min-height: 36px;
+    min-width: 60px;
+    margin-left: 8px;
+}
+
+.btn-mas-gramos:hover {
+    background: #e6a700;
+    transform: translateY(-1px);
+}
+
+.btn-mas-gramos:active {
+    transform: translateY(0);
+}
+
+/* Input para gramos */
+.input-gramos {
+    width: 80px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    text-align: center;
+    margin: 0 4px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .sidebar {
@@ -1149,6 +1216,11 @@ body {
     .metodos-pago {
         grid-template-columns: repeat(2, 1fr);
     }
+    
+    /* Mostrar botón de regreso en móviles */
+    .back-button-mobile {
+        display: flex;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1184,6 +1256,10 @@ body {
     
     .sugerencias-lista {
         max-height: 250px;
+    }
+    
+    .scanner-input {
+        flex-direction: column;
     }
 }
 
