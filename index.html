@@ -41,6 +41,11 @@
         </div>
     </nav>
 
+    <!-- Botón de regreso para móviles -->
+    <button class="back-button-mobile" id="backButtonMobile" onclick="goBack()">
+        <span class="material-icons">arrow_back</span>
+    </button>
+
     <!-- Barra lateral -->
     <aside class="sidebar" id="sidebar">
         <nav class="sidebar-nav">
@@ -299,7 +304,8 @@
                     <div class="scanner-input">
                         <input type="text" id="codigoBarrasInput" 
                                placeholder="Escanea o ingresa código de barras o nombre del producto"
-                               onkeydown="manejarEntradaEscaneo(event)">
+                               onkeydown="manejarEntradaEscaneo(event)"
+                               oninput="mostrarSugerenciasCarritoEnTiempoReal()">
                         <button class="btn btn-primary" onclick="agregarPorCodigoBarras()">
                             <span class="material-icons">add</span>
                             Agregar
