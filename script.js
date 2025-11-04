@@ -951,46 +951,6 @@ function agregarProductoPorUnidad(producto) {
     finalizarAgregadoProducto();
 }
 
-function agregarProductoPorGramos(producto) {
-    const gramos = prompt(`Ingrese los gramos para "${producto.nombre}":\n\nPrecio por gramo: Bs ${(producto.precioUnitarioBolivar * 0.001).toFixed(4)}`, "100");
-    
-    if (gramos === null) return; // Usuario canceló
-    
-    const gramosNum = parseFloat(gramos);
-    if (isNaN(gramosNum) || gramosNum <= 0) {
-        showToast("Ingrese una cantidad válida de gramos", 'error');
-        return;
-    }
-
-    const precioPorGramo = producto.precioUnitarioBolivar * 0.001;
-    const subtotal = redondear2Decimales(gramosNum * precioPorGramo);
-    const subtotalDolar = redondear2Decimales(gramosNum * producto.precioUnitarioDolar * 0.001);
-
-    const enCarrito = carrito.findIndex(item => 
-        item.nombre === producto.nombre && item.unidad === 'gramo'
-    );
-
-    if (enCarrito !== -1) {
-        carrito[enCarrito].cantidad += gramosNum;
-        carrito[enCarrito].subtotal = redondear2Decimales(carrito[enCarrito].cantidad * precioPorGramo);
-        carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * producto.precioUnitarioDolar * 0.001);
-    } else {
-        carrito.push({
-            nombre: producto.nombre,
-            descripcion: producto.descripcion,
-            precioUnitarioBolivar: producto.precioUnitarioBolivar,
-            precioUnitarioDolar: producto.precioUnitarioDolar,
-            cantidad: gramosNum,
-            unidad: 'gramo',
-            subtotal: subtotal,
-            subtotalDolar: subtotalDolar,
-            indexProducto: productos.findIndex(p => p.nombre === producto.nombre)
-        });
-    }
-
-    finalizarAgregadoProducto();
-}
-
 function finalizarAgregadoProducto() {
     const codigoInput = document.getElementById('codigoBarrasInput');
     if (codigoInput) {
@@ -1081,7 +1041,13 @@ function modificarGramos(index) {
     const item = carrito[index];
     if (!item || item.unidad !== 'gramo') return;
     
-    const nuevosGramos = prompt(`Modificar gramos para "${item.nombre}":\n\nGramos actuales: ${item.cantidad} g\nPrecio por gramo: Bs ${(item.precioUnitarioBolivar * 0.001).toFixed(4)}`, item.cantidad);
+    const nuevosGramos = prompt(
+        `Modificar gramos para "${item.nombre}":\n\n` +
+        `Gramos actuales: ${item.cantidad} g\n` +
+        `Precio por gramo: Bs ${(item.precioUnitarioBolivar * 0.001).toFixed(4)}\n` +
+        `Subtotal actual: Bs ${item.subtotal.toFixed(2)}`,
+        item.cantidad
+    );
     
     if (nuevosGramos === null) return; // Usuario canceló
     
@@ -1096,7 +1062,7 @@ function modificarGramos(index) {
 
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
-    showToast(`Gramos actualizados: ${gramosNum} g`, 'success');
+    showToast(`Gramos actualizados: ${gramosNum} g - Total: Bs ${item.subtotal.toFixed(2)}`, 'success');
 }
 
 function actualizarCantidadCarrito(index, cambio) {
@@ -1106,10 +1072,15 @@ function actualizarCantidadCarrito(index, cambio) {
     if (item.unidad === 'gramo') {
         // Para gramos, cambiar en incrementos de 10g
         const incremento = cambio * 10;
-        item.cantidad = Math.max(10, item.cantidad + incremento);
+        const nuevaCantidad = Math.max(10, item.cantidad + incremento);
+        item.cantidad = nuevaCantidad;
+        showToast(`${item.nombre}: ${nuevaCantidad} g`, 'info', 1500);
     } else {
         // Para unidades, cambiar de una en una
         item.cantidad += cambio;
+        if (item.cantidad > 1) {
+            showToast(`${item.nombre}: ${item.cantidad} unidades`, 'info', 1500);
+        }
     }
 
     if (item.cantidad <= 0) {
@@ -1142,24 +1113,20 @@ function cambiarUnidadCarrito(index, nuevaUnidad) {
     
     if (item.unidad === nuevaUnidad) return;
     
-    // Si cambia de unidad a gramos, pedir la cantidad
+    // Si cambia de unidad a gramos, establecer cantidad inicial en 100g
     if (nuevaUnidad === 'gramo') {
-        const gramos = prompt(`Ingrese los gramos para "${item.nombre}":`, "100");
-        if (gramos === null) return; // Usuario canceló
-        
-        const gramosNum = parseFloat(gramos);
-        if (isNaN(gramosNum) || gramosNum <= 0) {
-            showToast("Ingrese una cantidad válida de gramos", 'error');
-            return;
-        }
-        item.cantidad = gramosNum;
+        item.cantidad = 100; // 100 gramos por defecto
+        item.unidad = 'gramo';
+        calcularSubtotalSegunUnidad(item);
+        showToast(`Cambiado a gramos: ${item.cantidad}g`, 'success');
     } else {
         // Si cambia de gramos a unidad, establecer cantidad en 1
         item.cantidad = 1;
+        item.unidad = 'unidad';
+        calcularSubtotalSegunUnidad(item);
+        showToast('Cambiado a unidades', 'success');
     }
     
-    item.unidad = nuevaUnidad;
-    calcularSubtotalSegunUnidad(item);
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
 }
