@@ -917,17 +917,9 @@ function agregarProductoDesdeSugerencia(nombreProducto) {
 }
 
 function agregarProductoAlCarrito(productoEncontrado) {
-    // Mostrar modal para seleccionar unidad si el producto se vende por gramos
-    if (confirm(`¿Agregar "${productoEncontrado.nombre}"?\n\n¿Desea vender por gramos? (Cancelar para unidades)`)) {
-        agregarProductoPorGramos(productoEncontrado);
-    } else {
-        agregarProductoPorUnidad(productoEncontrado);
-    }
-}
-
-function agregarProductoPorUnidad(producto) {
+    // Agregar directamente por unidad SIN preguntar
     const enCarrito = carrito.findIndex(item => 
-        item.nombre === producto.nombre && item.unidad === 'unidad'
+        item.nombre === productoEncontrado.nombre && item.unidad === 'unidad'
     );
 
     if (enCarrito !== -1) {
@@ -936,15 +928,15 @@ function agregarProductoPorUnidad(producto) {
         carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioDolar);
     } else {
         carrito.push({
-            nombre: producto.nombre,
-            descripcion: producto.descripcion,
-            precioUnitarioBolivar: producto.precioUnitarioBolivar,
-            precioUnitarioDolar: producto.precioUnitarioDolar,
+            nombre: productoEncontrado.nombre,
+            descripcion: productoEncontrado.descripcion,
+            precioUnitarioBolivar: productoEncontrado.precioUnitarioBolivar,
+            precioUnitarioDolar: productoEncontrado.precioUnitarioDolar,
             cantidad: 1,
             unidad: 'unidad',
-            subtotal: producto.precioUnitarioBolivar,
-            subtotalDolar: producto.precioUnitarioDolar,
-            indexProducto: productos.findIndex(p => p.nombre === producto.nombre)
+            subtotal: productoEncontrado.precioUnitarioBolivar,
+            subtotalDolar: productoEncontrado.precioUnitarioDolar,
+            indexProducto: productos.findIndex(p => p.nombre === productoEncontrado.nombre)
         });
     }
 
@@ -1041,11 +1033,17 @@ function modificarGramos(index) {
     const item = carrito[index];
     if (!item || item.unidad !== 'gramo') return;
     
+    const producto = productos[item.indexProducto];
+    if (!producto) return;
+    
+    const precioPorGramo = producto.precioUnitarioBolivar * 0.001;
+    const precioPorGramoDolar = producto.precioUnitarioDolar * 0.001;
+    
     const nuevosGramos = prompt(
         `Modificar gramos para "${item.nombre}":\n\n` +
         `Gramos actuales: ${item.cantidad} g\n` +
-        `Precio por gramo: Bs ${(item.precioUnitarioBolivar * 0.001).toFixed(4)}\n` +
-        `Subtotal actual: Bs ${item.subtotal.toFixed(2)}`,
+        `Precio por gramo: Bs ${precioPorGramo.toFixed(4)}\n` +
+        `Subtotal actual: Bs ${item.subtotal.toFixed(2)} / $${item.subtotalDolar.toFixed(2)}`,
         item.cantidad
     );
     
@@ -1070,11 +1068,14 @@ function actualizarCantidadCarrito(index, cambio) {
     if (!item) return;
 
     if (item.unidad === 'gramo') {
-        // Para gramos, cambiar en incrementos de 10g
-        const incremento = cambio * 10;
-        const nuevaCantidad = Math.max(10, item.cantidad + incremento);
+        // Para gramos, cambiar en incrementos de 1g
+        const incremento = cambio * 1; // 1 gramo por click
+        const nuevaCantidad = Math.max(1, item.cantidad + incremento);
         item.cantidad = nuevaCantidad;
-        showToast(`${item.nombre}: ${nuevaCantidad} g`, 'info', 1500);
+        
+        const producto = productos[item.indexProducto];
+        const precioPorGramo = producto ? producto.precioUnitarioBolivar * 0.001 : 0;
+        showToast(`${item.nombre}: ${nuevaCantidad} g (Bs ${precioPorGramo.toFixed(4)}/g)`, 'info', 1500);
     } else {
         // Para unidades, cambiar de una en una
         item.cantidad += cambio;
@@ -1099,9 +1100,13 @@ function calcularSubtotalSegunUnidad(item) {
     if (!producto) return;
 
     if (item.unidad === 'gramo') {
-        item.subtotal = redondear2Decimales(item.cantidad * item.precioUnitarioBolivar * 0.001);
-        item.subtotalDolar = redondear2Decimales(item.cantidad * item.precioUnitarioDolar * 0.001);
+        // Precio por GRAMO (no por 100g)
+        const precioPorGramo = producto.precioUnitarioBolivar * 0.001;
+        const precioPorGramoDolar = producto.precioUnitarioDolar * 0.001;
+        item.subtotal = redondear2Decimales(item.cantidad * precioPorGramo);
+        item.subtotalDolar = redondear2Decimales(item.cantidad * precioPorGramoDolar);
     } else {
+        // Precio por UNIDAD
         item.subtotal = redondear2Decimales(item.cantidad * item.precioUnitarioBolivar);
         item.subtotalDolar = redondear2Decimales(item.cantidad * item.precioUnitarioDolar);
     }
@@ -1113,12 +1118,15 @@ function cambiarUnidadCarrito(index, nuevaUnidad) {
     
     if (item.unidad === nuevaUnidad) return;
     
-    // Si cambia de unidad a gramos, establecer cantidad inicial en 100g
+    const producto = productos[item.indexProducto];
+    if (!producto) return;
+
+    // Si cambia de unidad a gramos, establecer cantidad inicial en 1g
     if (nuevaUnidad === 'gramo') {
-        item.cantidad = 100; // 100 gramos por defecto
+        item.cantidad = 1; // 1 gramo por defecto
         item.unidad = 'gramo';
         calcularSubtotalSegunUnidad(item);
-        showToast(`Cambiado a gramos: ${item.cantidad}g`, 'success');
+        showToast(`Cambiado a gramos: ${item.cantidad}g - Precio: Bs ${(producto.precioUnitarioBolivar * 0.001).toFixed(4)}/g`, 'success');
     } else {
         // Si cambia de gramos a unidad, establecer cantidad en 1
         item.cantidad = 1;
