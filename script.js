@@ -4,14 +4,126 @@ let nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
 let tasaBCVGuardada = parseFloat(localStorage.getItem('tasaBCV')) || 0;
 let ventasDiarias = JSON.parse(localStorage.getItem('ventasDiarias')) || [];
 let carrito = JSON.parse(localStorage.getItem('carrito')) || [];
-let métodoPagoSeleccionado = null;
+let metodoPagoSeleccionado = null;
 let detallesPago = {};
 let productoEditando = null;
 let productosFiltrados = [];
+let historialNavegacion = ['inicio']; // Historial para el botón de regreso
 
 // Variables para escáner
 let tiempoUltimaTecla = 0;
 let bufferEscaneo = '';
+
+// ===== SISTEMA DE SEGURIDAD F12 =====
+(function() {
+    'use strict';
+    
+    // Bloquear F12 y combinaciones de teclas
+    document.addEventListener('keydown', function(e) {
+        // Bloquear F12
+        if (e.key === 'F12' || e.keyCode === 123) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+I (Inspeccionar)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.keyCode === 73)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+J (Consola)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.keyCode === 74)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+Shift+C (Inspeccionar elemento)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.keyCode === 67)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+        
+        // Bloquear Ctrl+U (Ver código fuente)
+        if (e.ctrlKey && (e.key === 'U' || e.keyCode === 85)) {
+            e.preventDefault();
+            mostrarAdvertenciaSeguridad();
+            return false;
+        }
+    });
+    
+    // Bloquear clic derecho
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        mostrarAdvertenciaSeguridad();
+        return false;
+    });
+    
+    // Detectar apertura de herramientas de desarrollo
+    let devtools = function() {};
+    devtools.toString = function() {
+        mostrarAdvertenciaSeguridad();
+        return '';
+    };
+    
+    console.log('%c🔒 ACCESO RESTRINGIDO 🔒', 'color: red; font-size: 24px; font-weight: bold;');
+    console.log('El uso de herramientas de desarrollo está restringido en esta aplicación.');
+    console.log(devtools);
+    
+    // Detectar cambios en el tamaño de la ventana (posible apertura de devtools)
+    const threshold = 160;
+    const checkDevTools = function() {
+        const widthThreshold = window.outerWidth - window.innerWidth > threshold;
+        const heightThreshold = window.outerHeight - window.innerHeight > threshold;
+        
+        if (widthThreshold || heightThreshold) {
+            mostrarAdvertenciaSeguridad();
+        }
+    };
+    
+    setInterval(checkDevTools, 1000);
+    
+    function mostrarAdvertenciaSeguridad() {
+        // Mostrar toast de advertencia
+        showToast('⚠️ Acceso restringido: Uso no autorizado de herramientas de desarrollo', 'error', 5000);
+        
+        // Opcional: Redirigir después de múltiples intentos
+        setTimeout(() => {
+            window.location.href = "about:blank";
+        }, 3000);
+    }
+})();
+
+// ===== SISTEMA DE NAVEGACIÓN CON BOTÓN DE REGRESO =====
+function goBack() {
+    if (historialNavegacion.length > 1) {
+        // Remover la sección actual
+        historialNavegacion.pop();
+        // Obtener la sección anterior
+        const seccionAnterior = historialNavegacion[historialNavegacion.length - 1];
+        // Mostrar la sección anterior
+        showSection(seccionAnterior);
+    } else {
+        // Si no hay historial, ir al inicio
+        showSection('inicio');
+    }
+}
+
+function actualizarBotonRegreso() {
+    const backButton = document.getElementById('backButtonMobile');
+    if (!backButton) return;
+    
+    // Mostrar botón solo si no estamos en la sección de inicio y hay historial
+    if (historialNavegacion.length > 1) {
+        backButton.classList.add('visible');
+    } else {
+        backButton.classList.remove('visible');
+    }
+}
 
 // ===== INICIALIZACIÓN =====
 document.addEventListener('DOMContentLoaded', function() {
@@ -22,6 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
     configurarEventos();
     configurarEventosMoviles();
     limpiarVentasAntiguas(); // Limpiar ventas de más de 7 días
+    actualizarBotonRegreso();
     
     // Enfocar input de escáner al cargar
     setTimeout(() => {
@@ -80,6 +193,14 @@ function showSection(sectionId) {
     if (activeNav) {
         activeNav.classList.add('active');
     }
+    
+    // Actualizar historial de navegación
+    if (historialNavegacion[historialNavegacion.length - 1] !== sectionId) {
+        historialNavegacion.push(sectionId);
+    }
+    
+    // Actualizar botón de regreso
+    actualizarBotonRegreso();
     
     // Cargar datos específicos de la sección
     switch(sectionId) {
@@ -586,6 +707,57 @@ function eliminarProducto(index) {
 }
 
 // ===== CARRITO DE VENTAS - FUNCIONES MEJORADAS =====
+function mostrarSugerenciasCarritoEnTiempoReal() {
+    const codigoInput = document.getElementById('codigoBarrasInput');
+    const sugerenciasDiv = document.getElementById('sugerencias');
+    
+    if (!codigoInput || !sugerenciasDiv) return;
+    
+    const termino = codigoInput.value.trim().toLowerCase();
+    sugerenciasDiv.innerHTML = '';
+    sugerenciasDiv.style.display = 'none';
+
+    if (termino.length < 2) return;
+
+    const coincidencias = productos.filter(p =>
+        (p.nombre || '').toLowerCase().includes(termino) ||
+        (p.codigoBarras && p.codigoBarras.toLowerCase().includes(termino))
+    );
+
+    if (coincidencias.length > 0) {
+        sugerenciasDiv.style.display = 'block';
+        
+        // Título de sugerencias
+        const titulo = document.createElement('div');
+        titulo.className = 'sugerencia-titulo';
+        titulo.textContent = `Sugerencias (${coincidencias.length} encontrados):`;
+        sugerenciasDiv.appendChild(titulo);
+
+        coincidencias.slice(0, 6).forEach(prod => {
+            const opcion = document.createElement('div');
+            opcion.className = 'sugerencia-item';
+            opcion.innerHTML = `
+                <div style="flex: 1;">
+                    <strong>${prod.nombre}</strong>
+                    <div style="font-size: 12px; color: #666;">${prod.descripcion}</div>
+                    <div style="font-size: 11px; color: #888;">Precio: Bs ${prod.precioUnitarioBolivar.toFixed(2)}</div>
+                </div>
+                <button class="btn-agregar-sugerencia" onclick="agregarProductoDesdeSugerencia('${prod.nombre}')">
+                    Agregar
+                </button>
+            `;
+            
+            // Agregar al hacer clic en cualquier parte del item
+            opcion.addEventListener('click', function(e) {
+                if (e.target.classList.contains('btn-agregar-sugerencia')) return;
+                agregarProductoDesdeSugerencia(prod.nombre);
+            });
+            
+            sugerenciasDiv.appendChild(opcion);
+        });
+    }
+}
+
 function agregarPorCodigoBarras() {
     const codigo = document.getElementById('codigoBarrasInput').value.trim();
     if (!codigo) {
@@ -647,6 +819,41 @@ function procesarEscaneo(codigo) {
     agregarProductoAlCarrito(productoEncontrado);
 }
 
+function mostrarSugerenciasCarrito(coincidencias, codigo) {
+    const sugerenciasDiv = document.getElementById('sugerencias');
+    if (!sugerenciasDiv) return;
+    
+    sugerenciasDiv.innerHTML = '';
+    sugerenciasDiv.style.display = 'block';
+    
+    const titulo = document.createElement('div');
+    titulo.className = 'sugerencia-titulo';
+    titulo.textContent = `Múltiples coincidencias para "${codigo}":`;
+    sugerenciasDiv.appendChild(titulo);
+
+    coincidencias.slice(0, 6).forEach(prod => {
+        const opcion = document.createElement('div');
+        opcion.className = 'sugerencia-item';
+        opcion.innerHTML = `
+            <div style="flex: 1;">
+                <strong>${prod.nombre}</strong>
+                <div style="font-size: 12px; color: #666;">${prod.descripcion}</div>
+                <div style="font-size: 11px; color: #888;">Código: ${prod.codigoBarras || 'N/A'}</div>
+            </div>
+            <button class="btn-agregar-sugerencia" onclick="agregarProductoDesdeSugerencia('${prod.nombre}')">
+                Agregar
+            </button>
+        `;
+        
+        opcion.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-agregar-sugerencia')) return;
+            agregarProductoDesdeSugerencia(prod.nombre);
+        });
+        
+        sugerenciasDiv.appendChild(opcion);
+    });
+}
+
 // FUNCIÓN PARA AGREGAR PRODUCTO DESDE SUGERENCIA
 function agregarProductoDesdeSugerencia(nombreProducto) {
     const producto = productos.find(p => p.nombre === nombreProducto);
@@ -662,8 +869,17 @@ function agregarProductoDesdeSugerencia(nombreProducto) {
 }
 
 function agregarProductoAlCarrito(productoEncontrado) {
+    // Mostrar modal para seleccionar unidad si el producto se vende por gramos
+    if (confirm(`¿Agregar "${productoEncontrado.nombre}"?\n\n¿Desea vender por gramos? (Cancelar para unidades)`)) {
+        agregarProductoPorGramos(productoEncontrado);
+    } else {
+        agregarProductoPorUnidad(productoEncontrado);
+    }
+}
+
+function agregarProductoPorUnidad(producto) {
     const enCarrito = carrito.findIndex(item => 
-        item.nombre === productoEncontrado.nombre && item.unidad === 'unidad'
+        item.nombre === producto.nombre && item.unidad === 'unidad'
     );
 
     if (enCarrito !== -1) {
@@ -672,18 +888,62 @@ function agregarProductoAlCarrito(productoEncontrado) {
         carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * carrito[enCarrito].precioUnitarioDolar);
     } else {
         carrito.push({
-            nombre: productoEncontrado.nombre,
-            descripcion: productoEncontrado.descripcion,
-            precioUnitarioBolivar: productoEncontrado.precioUnitarioBolivar,
-            precioUnitarioDolar: productoEncontrado.precioUnitarioDolar,
+            nombre: producto.nombre,
+            descripcion: producto.descripcion,
+            precioUnitarioBolivar: producto.precioUnitarioBolivar,
+            precioUnitarioDolar: producto.precioUnitarioDolar,
             cantidad: 1,
             unidad: 'unidad',
-            subtotal: productoEncontrado.precioUnitarioBolivar,
-            subtotalDolar: productoEncontrado.precioUnitarioDolar,
-            indexProducto: productos.findIndex(p => p.nombre === productoEncontrado.nombre)
+            subtotal: producto.precioUnitarioBolivar,
+            subtotalDolar: producto.precioUnitarioDolar,
+            indexProducto: productos.findIndex(p => p.nombre === producto.nombre)
         });
     }
 
+    finalizarAgregadoProducto();
+}
+
+function agregarProductoPorGramos(producto) {
+    const gramos = prompt(`Ingrese los gramos para "${producto.nombre}":\n\nPrecio por gramo: Bs ${(producto.precioUnitarioBolivar * 0.001).toFixed(4)}`, "100");
+    
+    if (gramos === null) return; // Usuario canceló
+    
+    const gramosNum = parseFloat(gramos);
+    if (isNaN(gramosNum) || gramosNum <= 0) {
+        showToast("Ingrese una cantidad válida de gramos", 'error');
+        return;
+    }
+
+    const precioPorGramo = producto.precioUnitarioBolivar * 0.001;
+    const subtotal = redondear2Decimales(gramosNum * precioPorGramo);
+    const subtotalDolar = redondear2Decimales(gramosNum * producto.precioUnitarioDolar * 0.001);
+
+    const enCarrito = carrito.findIndex(item => 
+        item.nombre === producto.nombre && item.unidad === 'gramo'
+    );
+
+    if (enCarrito !== -1) {
+        carrito[enCarrito].cantidad += gramosNum;
+        carrito[enCarrito].subtotal = redondear2Decimales(carrito[enCarrito].cantidad * precioPorGramo);
+        carrito[enCarrito].subtotalDolar = redondear2Decimales(carrito[enCarrito].cantidad * producto.precioUnitarioDolar * 0.001);
+    } else {
+        carrito.push({
+            nombre: producto.nombre,
+            descripcion: producto.descripcion,
+            precioUnitarioBolivar: producto.precioUnitarioBolivar,
+            precioUnitarioDolar: producto.precioUnitarioDolar,
+            cantidad: gramosNum,
+            unidad: 'gramo',
+            subtotal: subtotal,
+            subtotalDolar: subtotalDolar,
+            indexProducto: productos.findIndex(p => p.nombre === producto.nombre)
+        });
+    }
+
+    finalizarAgregadoProducto();
+}
+
+function finalizarAgregadoProducto() {
     const codigoInput = document.getElementById('codigoBarrasInput');
     if (codigoInput) {
         codigoInput.value = '';
@@ -732,12 +992,21 @@ function actualizarCarrito() {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${item.nombre} (${item.descripcion})</td>
+            <td>
+                <div><strong>${item.nombre}</strong></div>
+                <div style="font-size: 12px; color: #666;">${item.descripcion}</div>
+            </td>
             <td>Bs ${item.precioUnitarioBolivar.toFixed(2)}</td>
             <td>
-                <button class="btn btn-secondary" onclick="actualizarCantidadCarrito(${index}, -1)" style="padding: 4px 8px; margin: 2px;">-</button>
-                ${cantidadMostrada}
-                <button class="btn btn-secondary" onclick="actualizarCantidadCarrito(${index}, 1)" style="padding: 4px 8px; margin: 2px;">+</button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="actualizarCantidadCarrito(${index}, -1)" style="padding: 4px 8px; margin: 2px;">-</button>
+                    <span>${cantidadMostrada}</span>
+                    <button class="btn btn-secondary" onclick="actualizarCantidadCarrito(${index}, 1)" style="padding: 4px 8px; margin: 2px;">+</button>
+                    ${item.unidad === 'gramo' ? 
+                        `<button class="btn-mas-gramos" onclick="modificarGramos(${index})" title="Modificar gramos">MAS</button>` : 
+                        ''
+                    }
+                </div>
             </td>
             <td>
                 <select onchange="cambiarUnidadCarrito(${index}, this.value)" class="form-select" style="padding: 6px; font-size: 12px;">
@@ -759,11 +1028,41 @@ function actualizarCarrito() {
     if (totalCarritoDolares) totalCarritoDolares.querySelector('strong').textContent = totalDolares.toFixed(2);
 }
 
+// FUNCIÓN PARA MODIFICAR GRAMOS DESDE EL CARRITO
+function modificarGramos(index) {
+    const item = carrito[index];
+    if (!item || item.unidad !== 'gramo') return;
+    
+    const nuevosGramos = prompt(`Modificar gramos para "${item.nombre}":\n\nGramos actuales: ${item.cantidad} g\nPrecio por gramo: Bs ${(item.precioUnitarioBolivar * 0.001).toFixed(4)}`, item.cantidad);
+    
+    if (nuevosGramos === null) return; // Usuario canceló
+    
+    const gramosNum = parseFloat(nuevosGramos);
+    if (isNaN(gramosNum) || gramosNum <= 0) {
+        showToast("Ingrese una cantidad válida de gramos", 'error');
+        return;
+    }
+
+    item.cantidad = gramosNum;
+    calcularSubtotalSegunUnidad(item);
+
+    localStorage.setItem('carrito', JSON.stringify(carrito));
+    actualizarCarrito();
+    showToast(`Gramos actualizados: ${gramosNum} g`, 'success');
+}
+
 function actualizarCantidadCarrito(index, cambio) {
     const item = carrito[index];
     if (!item) return;
 
-    item.cantidad += cambio;
+    if (item.unidad === 'gramo') {
+        // Para gramos, cambiar en incrementos de 10g
+        const incremento = cambio * 10;
+        item.cantidad = Math.max(10, item.cantidad + incremento);
+    } else {
+        // Para unidades, cambiar de una en una
+        item.cantidad += cambio;
+    }
 
     if (item.cantidad <= 0) {
         eliminarDelCarrito(index);
@@ -790,8 +1089,29 @@ function calcularSubtotalSegunUnidad(item) {
 }
 
 function cambiarUnidadCarrito(index, nuevaUnidad) {
-    carrito[index].unidad = nuevaUnidad;
-    calcularSubtotalSegunUnidad(carrito[index]);
+    const item = carrito[index];
+    if (!item) return;
+    
+    if (item.unidad === nuevaUnidad) return;
+    
+    // Si cambia de unidad a gramos, pedir la cantidad
+    if (nuevaUnidad === 'gramo') {
+        const gramos = prompt(`Ingrese los gramos para "${item.nombre}":`, "100");
+        if (gramos === null) return; // Usuario canceló
+        
+        const gramosNum = parseFloat(gramos);
+        if (isNaN(gramosNum) || gramosNum <= 0) {
+            showToast("Ingrese una cantidad válida de gramos", 'error');
+            return;
+        }
+        item.cantidad = gramosNum;
+    } else {
+        // Si cambia de gramos a unidad, establecer cantidad en 1
+        item.cantidad = 1;
+    }
+    
+    item.unidad = nuevaUnidad;
+    calcularSubtotalSegunUnidad(item);
     localStorage.setItem('carrito', JSON.stringify(carrito));
     actualizarCarrito();
 }
@@ -1751,41 +2071,7 @@ function cargarBackup(files) {
     document.getElementById('fileInput').value = '';
 }
 
-// ===== SISTEMA DE SEGURIDAD =====
-function toggleCopyrightNotice() {
-    const notice = document.getElementById('copyrightNotice');
-    if (!notice) return;
-    notice.style.display = notice.style.display === 'block' ? 'none' : 'block';
-}
-
-// Protección contra F12 y herramientas de desarrollo
-(function() {
-    function mostrarAdvertenciaSeguridad() {
-        console.log('%c⚠️ ACCESO RESTRINGIDO ⚠️', 'color: red; font-size: 20px; font-weight: bold;');
-        console.log('El uso de herramientas de desarrollo está restringido en esta aplicación.');
-        alert('⚠️ Acceso restringido\nEl uso de F12 y herramientas de desarrollo no está permitido en esta aplicación.');
-    }
-    
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'F12' || e.keyCode === 123 ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.keyCode === 73)) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'J' || e.keyCode === 74)) ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.keyCode === 67)) ||
-            (e.ctrlKey && (e.key === 'U' || e.keyCode === 85))) {
-            e.preventDefault();
-            mostrarAdvertenciaSeguridad();
-            return false;
-        }
-    });
-    
-    document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        mostrarAdvertenciaSeguridad();
-        return false;
-    });
-})();
-
-// Sistema de inactividad
+// ===== SISTEMA DE INACTIVIDAD =====
 const TIEMPO_INACTIVIDAD = 4 * 60 * 1000;
 const URL_REDIRECCION = "http://portal.calculadoramagica.lat/";
 
@@ -1833,6 +2119,13 @@ function reiniciarTemporizador() {
 ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'input'].forEach(evento => {
     document.addEventListener(evento, registrarActividad, { passive: true });
 });
+
+// ===== FUNCIONES ADICIONALES =====
+function toggleCopyrightNotice() {
+    const notice = document.getElementById('copyrightNotice');
+    if (!notice) return;
+    notice.style.display = notice.style.display === 'block' ? 'none' : 'block';
+}
 
 // Cerrar modales al hacer clic fuera
 window.onclick = function(event) {
