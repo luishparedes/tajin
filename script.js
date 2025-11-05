@@ -1,4 +1,4 @@
-// ===== VARIABLES GLOBALES =====
+// ===== VARIABLES GLOBALES MEJORADAS =====
 let productos = JSON.parse(localStorage.getItem('productos')) || [];
 let nombreEstablecimiento = localStorage.getItem('nombreEstablecimiento') || '';
 let tasaBCVGuardada = parseFloat(localStorage.getItem('tasaBCV')) || 0;
@@ -8,11 +8,577 @@ let metodoPagoSeleccionado = null;
 let detallesPago = {};
 let productoEditando = null;
 let productosFiltrados = [];
-let historialNavegacion = ['inicio']; // Historial para el botón de regreso
+let historialNavegacion = ['inicio'];
+
+// Variables para gestión de usuarios y sesiones
+let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [];
+let usuarioActual = JSON.parse(localStorage.getItem('usuarioActual')) || null;
+let sesionesActivas = JSON.parse(localStorage.getItem('sesionesActivas')) || [];
+let tiempoInicioSesion = null;
+let temporizadorSesion = null;
 
 // Variables para escáner
 let tiempoUltimaTecla = 0;
 let bufferEscaneo = '';
+
+// Configuración de seguridad
+const CONFIG_SEGURIDAD = {
+    emailRecuperacion: 'admin@tienda.com',
+    claveMaestra: 'admin123',
+    intentosMaximos: 3,
+    tiempoBloqueo: 300000,
+    tiempoSesion: 8 * 60 * 60 * 1000 // 8 horas en milisegundos
+};
+
+// ===== SISTEMA DE LOGIN Y AUTENTICACIÓN =====
+function inicializarSistemaLogin() {
+    const modalLogin = document.getElementById('modalLogin');
+    
+    // Si no hay usuarios, crear administrador por defecto
+    if (usuarios.length === 0) {
+        crearUsuarioPorDefecto();
+    }
+    
+    // Si hay un usuario en sesión, restaurarla
+    if (usuarioActual && esSesionValida(usuarioActual.id)) {
+        iniciarSesion(usuarioActual, false);
+        modalLogin.style.display = 'none';
+    } else {
+        // Mostrar modal de login
+        modalLogin.style.display = 'block';
+        cargarOpcionesLogin();
+        usuarioActual = null;
+        localStorage.removeItem('usuarioActual');
+    }
+}
+
+function crearUsuarioPorDefecto() {
+    const adminPorDefecto = {
+        id: generarId(),
+        nombre: 'Administrador Principal',
+        tipo: 'admin',
+        password: 'admin123',
+        fechaCreacion: new Date().toISOString(),
+        activo: true,
+        ultimoAcceso: null,
+        sesiones: []
+    };
+    usuarios.push(adminPorDefecto);
+    localStorage.setItem('usuarios', JSON.stringify(usuarios));
+}
+
+function cargarOpcionesLogin() {
+    const loginOptions = document.getElementById('loginOptions');
+    if (!loginOptions) return;
+    
+    loginOptions.innerHTML = '';
+    
+    if (usuarios.length === 0) {
+        loginOptions.innerHTML = `
+            <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                <span class="material-icons" style="font-size: 48px; margin-bottom: 16px;">people</span>
+                <p>No hay usuarios registrados</p>
+            </div>
+        `;
+        return;
+    }
+    
+    usuarios.forEach(usuario => {
+        if (!usuario.activo) return;
+        
+        const userOption = document.createElement('div');
+        userOption.className = 'user-login-option';
+        userOption.onclick = () => prepararLogin(usuario);
+        
+        const iniciales = obtenerIniciales(usuario.nombre);
+        const estaActivo = estaUsuarioActivo(usuario.id);
+        
+        userOption.innerHTML = `
+            <div class="user-avatar" style="background: ${usuario.tipo === 'admin' ? '#1976d2' : '#2e7d32'}">
+                ${iniciales}
+            </div>
+            <div class="user-login-info">
+                <h4>${usuario.nombre}</h4>
+                <p>${usuario.tipo === 'admin' ? 'Administrador' : 'Cajero'}</p>
+                <div class="user-status ${estaActivo ? 'status-online' : 'status-offline'}">
+                    <span class="status-dot"></span>
+                    <span>${estaActivo ? 'En turno' : 'Disponible'}</span>
+                </div>
+            </div>
+            <span class="material-icons" style="color: var(--text-secondary);">chevron_right</span>
+        `;
+        
+        loginOptions.appendChild(userOption);
+    });
+}
+
+function prepararLogin(usuario) {
+    if (estaUsuarioActivo(usuario.id)) {
+        if (confirm(`El usuario ${usuario.nombre} ya tiene una sesión activa. ¿Desea tomar el control de la sesión?`)) {
+            finalizarSesionUsuario(usuario.id);
+            setTimeout(() => iniciarSesion(usuario), 500);
+        }
+    } else {
+        mostrarModalPassword(usuario);
+    }
+}
+
+function mostrarModalPassword(usuario) {
+    const password = prompt(`Ingrese la contraseña para ${usuario.nombre}:`);
+    if (password === null) return;
+    
+    if (password === usuario.password) {
+        iniciarSesion(usuario);
+    } else {
+        showToast('Contraseña incorrecta', 'error');
+    }
+}
+
+function iniciarSesion(usuario, mostrarMensaje = true) {
+    usuarioActual = usuario;
+    tiempoInicioSesion = new Date();
+    
+    // Actualizar último acceso
+    usuario.ultimoAcceso = new Date().toISOString();
+    localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    
+    // Registrar sesión
+    const nuevaSesion = {
+        id: generarId(),
+        usuarioId: usuario.id,
+        usuarioNombre: usuario.nombre,
+        tipoUsuario: usuario.tipo,
+        inicio: new Date().toISOString(),
+        activa: true
+    };
+    
+    sesionesActivas = sesionesActivas.filter(s => s.usuarioId !== usuario.id);
+    sesionesActivas.push(nuevaSesion);
+    localStorage.setItem('sesionesActivas', JSON.stringify(sesionesActivas));
+    localStorage.setItem('usuarioActual', JSON.stringify(usuario));
+    
+    // Ocultar modal de login
+    document.getElementById('modalLogin').style.display = 'none';
+    
+    // Actualizar interfaz
+    actualizarInterfazUsuario();
+    iniciarTemporizadorSesion();
+    
+    if (mostrarMensaje) {
+        showToast(`Bienvenido/a ${usuario.nombre}`, 'success');
+    }
+    
+    console.log(`Sesión iniciada: ${usuario.nombre} (${usuario.tipo})`);
+}
+
+function cerrarSesion() {
+    if (!usuarioActual) return;
+    
+    if (confirm(`¿Está seguro de cerrar la sesión de ${usuarioActual.nombre}?`)) {
+        finalizarSesionUsuario(usuarioActual.id);
+        
+        usuarioActual = null;
+        tiempoInicioSesion = null;
+        localStorage.removeItem('usuarioActual');
+        
+        if (temporizadorSesion) {
+            clearInterval(temporizadorSesion);
+        }
+        
+        // Mostrar modal de login
+        document.getElementById('modalLogin').style.display = 'block';
+        cargarOpcionesLogin();
+        
+        // Limpiar carrito al cerrar sesión
+        carrito = [];
+        localStorage.setItem('carrito', JSON.stringify(carrito));
+        
+        showToast('Sesión cerrada correctamente', 'success');
+    }
+}
+
+function finalizarSesionUsuario(usuarioId) {
+    sesionesActivas = sesionesActivas.filter(s => s.usuarioId !== usuarioId);
+    localStorage.setItem('sesionesActivas', JSON.stringify(sesionesActivas));
+}
+
+function estaUsuarioActivo(usuarioId) {
+    return sesionesActivas.some(s => s.usuarioId === usuarioId && s.activa);
+}
+
+function esSesionValida(usuarioId) {
+    const sesion = sesionesActivas.find(s => s.usuarioId === usuarioId && s.activa);
+    if (!sesion) return false;
+    
+    const inicioSesion = new Date(sesion.inicio);
+    const ahora = new Date();
+    const diferencia = ahora - inicioSesion;
+    
+    return diferencia < CONFIG_SEGURIDAD.tiempoSesion;
+}
+
+function actualizarInterfazUsuario() {
+    // Actualizar barra de navegación
+    const navRight = document.querySelector('.nav-right');
+    if (navRight && usuarioActual) {
+        // Remover indicador anterior si existe
+        const existingIndicator = navRight.querySelector('.user-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        const userIndicator = document.createElement('div');
+        userIndicator.className = 'user-indicator';
+        userIndicator.innerHTML = `
+            <span class="material-icons">person</span>
+            <span>${usuarioActual.nombre}</span>
+            <span class="user-badge" style="background: ${usuarioActual.tipo === 'admin' ? '#1976d2' : '#2e7d32'}; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px;">
+                ${usuarioActual.tipo === 'admin' ? 'ADMIN' : 'CAJERO'}
+            </span>
+            <button onclick="cerrarSesion()" style="background: none; border: none; color: white; cursor: pointer; margin-left: 8px;" title="Cerrar sesión">
+                <span class="material-icons" style="font-size: 16px;">logout</span>
+            </button>
+        `;
+        
+        // Insertar antes del botón de copyright
+        const copyrightBtn = navRight.querySelector('.nav-icon');
+        if (copyrightBtn) {
+            navRight.insertBefore(userIndicator, copyrightBtn);
+        } else {
+            navRight.appendChild(userIndicator);
+        }
+    }
+    
+    // Actualizar permisos de navegación
+    actualizarPermisosNavegacion();
+}
+
+function actualizarPermisosNavegacion() {
+    const navItems = document.querySelectorAll('.nav-item');
+    
+    navItems.forEach(item => {
+        const onclick = item.getAttribute('onclick');
+        if (!onclick) return;
+        
+        // Determinar si el item requiere permisos de admin
+        const seccionesAdmin = ['agregar-producto', 'lista-productos', 'configuracion'];
+        const seccion = onclick.match(/showSection\('([^']+)'\)/);
+        
+        if (seccion && seccionesAdmin.includes(seccion[1])) {
+            if (usuarioActual && usuarioActual.tipo === 'cajero') {
+                item.style.opacity = '0.5';
+                item.style.pointerEvents = 'none';
+                item.title = 'Se requiere permisos de administrador';
+            } else {
+                item.style.opacity = '1';
+                item.style.pointerEvents = 'auto';
+                item.title = '';
+            }
+        }
+    });
+}
+
+function iniciarTemporizadorSesion() {
+    if (temporizadorSesion) {
+        clearInterval(temporizadorSesion);
+    }
+    
+    temporizadorSesion = setInterval(() => {
+        if (!usuarioActual || !tiempoInicioSesion) return;
+        
+        const ahora = new Date();
+        const diferencia = ahora - tiempoInicioSesion;
+        
+        // Verificar si la sesión ha expirado (8 horas)
+        if (diferencia > CONFIG_SEGURIDAD.tiempoSesion) {
+            showToast('Sesión expirada por inactividad', 'warning');
+            cerrarSesion();
+        }
+    }, 60000); // Verificar cada minuto
+}
+
+// ===== FUNCIONES AUXILIARES =====
+function obtenerIniciales(nombre) {
+    return nombre.split(' ').map(p => p[0]).join('').toUpperCase().substring(0, 2);
+}
+
+function mostrarCrearUsuario() {
+    document.getElementById('modalCrearUsuario').style.display = 'block';
+}
+
+function cerrarModalCrearUsuario() {
+    document.getElementById('modalCrearUsuario').style.display = 'none';
+    document.getElementById('nombreUsuarioRapido').value = '';
+    document.getElementById('passwordUsuarioRapido').value = '';
+    document.getElementById('tipoUsuarioRapido').selectedIndex = 0;
+}
+
+function crearUsuarioRapido() {
+    const nombre = document.getElementById('nombreUsuarioRapido').value.trim();
+    const tipo = document.getElementById('tipoUsuarioRapido').value;
+    const password = document.getElementById('passwordUsuarioRapido').value;
+    
+    if (!nombre) {
+        showToast('Ingrese el nombre del usuario', 'error');
+        return;
+    }
+    
+    if (password.length < 4) {
+        showToast('La contraseña debe tener al menos 4 caracteres', 'error');
+        return;
+    }
+    
+    const usuarioExistente = usuarios.find(u => u.nombre.toLowerCase() === nombre.toLowerCase());
+    if (usuarioExistente) {
+        showToast('Ya existe un usuario con ese nombre', 'error');
+        return;
+    }
+    
+    const nuevoUsuario = {
+        id: generarId(),
+        nombre: nombre,
+        tipo: tipo,
+        password: password,
+        fechaCreacion: new Date().toISOString(),
+        activo: true,
+        ultimoAcceso: null,
+        sesiones: []
+    };
+    
+    usuarios.push(nuevoUsuario);
+    localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    
+    showToast(`Usuario ${tipo} creado exitosamente`, 'success');
+    cerrarModalCrearUsuario();
+    cargarOpcionesLogin();
+}
+
+function modoDemo() {
+    const usuarioDemo = {
+        id: 'demo',
+        nombre: 'Usuario Demo',
+        tipo: 'cajero',
+        password: 'demo123',
+        fechaCreacion: new Date().toISOString(),
+        activo: true,
+        ultimoAcceso: null
+    };
+    
+    iniciarSesion(usuarioDemo);
+    showToast('Modo demo activado - Sesión de demostración', 'info');
+}
+
+// ===== MODIFICACIONES EN LAS VENTAS PARA REGISTRAR CAJERO =====
+function finalizarVenta() {
+    if (carrito.length === 0) { 
+        showToast("El carrito está vacío", 'warning'); 
+        return; 
+    }
+    
+    if (!usuarioActual) {
+        showToast("Debe iniciar sesión para realizar ventas", 'error');
+        document.getElementById('modalLogin').style.display = 'block';
+        return;
+    }
+
+    const totalBs = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+    const totalDolares = carrito.reduce((sum, item) => sum + item.subtotalDolar, 0);
+
+    document.getElementById('resumenTotalBs').textContent = `Total: Bs ${redondear2Decimales(totalBs).toFixed(2)}`;
+    document.getElementById('resumenTotalDolares').textContent = `Total: $ ${redondear2Decimales(totalDolares).toFixed(2)}`;
+
+    document.getElementById('modalPago').style.display = 'block';
+    metodoPagoSeleccionado = null;
+    document.getElementById('detallesPago').style.display = 'none';
+    document.getElementById('camposPago').innerHTML = '';
+}
+
+function confirmarMetodoPago() {
+    if (!metodoPagoSeleccionado) { 
+        showToast("Seleccione un método de pago", 'error'); 
+        return; 
+    }
+    
+    if (!usuarioActual) {
+        showToast("Sesión no válida", 'error');
+        return;
+    }
+
+    const totalBs = carrito.reduce((sum, item) => sum + item.subtotal, 0);
+
+    // ... (el resto del código de confirmarMetodoPago permanece igual)
+    
+    // MODIFICACIÓN: Registrar el cajero en la venta
+    carrito.forEach(item => {
+        const producto = productos[item.indexProducto];
+        if (producto) {
+            if (item.unidad === 'gramo') {
+                producto.unidadesExistentes = redondear2Decimales(producto.unidadesExistentes - (item.cantidad / 1000));
+            } else {
+                producto.unidadesExistentes = redondear2Decimales(producto.unidadesExistentes - item.cantidad);
+            }
+
+            if (producto.unidadesExistentes < 0) {
+                producto.unidadesExistentes = 0;
+            }
+
+            ventasDiarias.push({
+                fecha: new Date().toLocaleDateString(),
+                hora: new Date().toLocaleTimeString(),
+                producto: producto.nombre,
+                cantidad: item.cantidad,
+                unidad: item.unidad,
+                totalBolivar: item.subtotal,
+                metodoPago: metodoPagoSeleccionado,
+                indexProducto: item.indexProducto,
+                // NUEVO: Registrar información del cajero
+                cajeroId: usuarioActual.id,
+                cajeroNombre: usuarioActual.nombre,
+                tipoCajero: usuarioActual.tipo,
+                sesionId: sesionesActivas.find(s => s.usuarioId === usuarioActual.id)?.id || 'N/A'
+            });
+        }
+    });
+
+    // ... (el resto del código permanece igual)
+}
+
+// ===== MODIFICACIONES EN LOS REPORTES =====
+function generarReportePorFechaEspecifica(fechaReporte) {
+    if (!ventasDiarias || ventasDiarias.length === 0) { 
+        showToast("No hay ventas registradas para generar reporte", 'warning'); 
+        return; 
+    }
+
+    const ventasFiltradas = ventasDiarias.filter(v => v.fecha === fechaReporte);
+    
+    if (ventasFiltradas.length === 0) {
+        showToast(`No hay ventas registradas para la fecha ${fechaReporte}`, 'warning');
+        return;
+    }
+
+    let totalVentasBs = 0;
+    let totalVentasDolares = 0;
+    
+    // Agrupar ventas por cajero
+    const ventasPorCajero = {};
+    ventasFiltradas.forEach(venta => {
+        const cajeroKey = venta.cajeroNombre || 'Sin asignar';
+        if (!ventasPorCajero[cajeroKey]) {
+            ventasPorCajero[cajeroKey] = {
+                ventas: 0,
+                totalBs: 0,
+                totalDolares: 0
+            };
+        }
+        ventasPorCajero[cajeroKey].ventas++;
+        ventasPorCajero[cajeroKey].totalBs += venta.totalBolivar || 0;
+        ventasPorCajero[cajeroKey].totalDolares += (venta.totalBolivar || 0) / tasaBCVGuardada;
+    });
+
+    const filas = ventasFiltradas.map(v => {
+        if (!v) return null;
+        
+        const totalBs = v.totalBolivar || 0;
+        const totalDolar = tasaBCVGuardada > 0 ? (totalBs / tasaBCVGuardada) : 0;
+        
+        totalVentasBs += totalBs;
+        totalVentasDolares += totalDolar;
+
+        return [
+            v.fecha || 'Sin fecha',
+            v.hora || 'Sin hora',
+            v.producto || 'Producto desconocido',
+            `${v.cantidad || 0} ${v.unidad || 'unidad'}`,
+            `Bs ${totalBs.toFixed(2)}`,
+            `$ ${totalDolar.toFixed(2)}`,
+            v.metodoPago || 'No especificado',
+            v.cajeroNombre || 'Sin asignar' // NUEVO: Mostrar cajero
+        ];
+    }).filter(fila => fila !== null);
+
+    if (filas.length === 0) {
+        showToast("No hay datos de ventas válidos para generar el reporte", 'error');
+        return;
+    }
+
+    const llaveMaestra = redondear2Decimales(totalVentasDolares / 100);
+    const reinvertir = redondear2Decimales(llaveMaestra * 50);
+    const gastosFijos = redondear2Decimales(llaveMaestra * 30);
+    const sueldo = redondear2Decimales(llaveMaestra * 20);
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(nombreEstablecimiento || 'Reporte Diario - Calculadora Mágica', 20, 25);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Fecha del reporte: ${fechaReporte}`, 20, 35);
+    doc.text(`Tasa BCV: ${tasaBCVGuardada.toFixed(2)}`, 20, 42);
+    doc.text(`Total de ventas: ${ventasFiltradas.length}`, 20, 49);
+
+    // NUEVO: Resumen por cajero
+    let yPos = 60;
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text('RESUMEN POR CAJERO:', 20, yPos);
+    yPos += 8;
+    
+    Object.keys(ventasPorCajero).forEach(cajero => {
+        const datos = ventasPorCajero[cajero];
+        doc.text(`${cajero}: ${datos.ventas} ventas - Bs ${datos.totalBs.toFixed(2)}`, 25, yPos);
+        yPos += 5;
+    });
+
+    doc.autoTable({
+        startY: yPos + 10,
+        head: [
+            ['Fecha', 'Hora', 'Producto', 'Cantidad', 'Total (Bs)', 'Total ($)', 'Método Pago', 'Cajero']
+        ],
+        body: filas,
+        styles: { 
+            fontSize: 7,
+            cellPadding: 2
+        },
+        headStyles: {
+            fillColor: [66, 133, 244],
+            textColor: 255,
+            fontStyle: 'bold'
+        },
+        alternateRowStyles: {
+            fillColor: [245, 245, 245]
+        },
+        margin: { top: yPos + 10 }
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 15;
+
+    // ... (el resto del reporte PDF permanece igual)
+}
+
+// ===== INICIALIZACIÓN MEJORADA =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Calculadora Mágica iniciada correctamente');
+    cargarDatosIniciales();
+    inicializarUsuarios();
+    inicializarSistemaLogin(); // NUEVO: Inicializar sistema de login
+    actualizarEstadisticas();
+    actualizarListaUsuarios();
+    configurarEventos();
+    configurarEventosMoviles();
+    limpiarVentasAntiguas();
+    actualizarBotonRegreso();
+    
+    setTimeout(() => {
+        const codigoInput = document.getElementById('codigoBarrasInput');
+        if (codigoInput) {
+            codigoInput.focus();
+        }
+    }, 1000);
+});
 
 // ===== SISTEMA DE SEGURIDAD F12 (Solo en Desktop) =====
 (function() {
