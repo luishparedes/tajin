@@ -35,6 +35,9 @@
             <div class="establecimiento-info">
                 <span id="currentEstablecimiento">Sin nombre</span>
             </div>
+            <button class="nav-icon" onclick="verPerfilUsuario()" title="Ver perfil">
+                <span class="material-icons">person</span>
+            </button>
             <button class="nav-icon" onclick="toggleCopyrightNotice()">
                 <span class="material-icons">copyright</span>
             </button>
@@ -415,36 +418,90 @@
             </div>
         </div>
 
-        <!-- Sección Configuración -->
+        <!-- Sección Configuración MEJORADA -->
         <div id="configuracion" class="content-section">
             <div class="section-header">
-                <h2>Configuración</h2>
-                <p>Configuración general del sistema</p>
+                <h2>Configuración del Sistema</h2>
+                <p>Gestión de usuarios, tasas y respaldos</p>
             </div>
 
             <div class="config-grid">
+                <!-- Gestión de Usuarios -->
                 <div class="config-card">
-                    <h3>Nombre del Establecimiento</h3>
-                    <div class="config-form">
-                        <input type="text" id="nombreEstablecimiento" class="form-input" placeholder="Ej: Tienda La Bendición">
-                        <button class="btn btn-primary" onclick="guardarNombreEstablecimiento()">
-                            <span class="material-icons">save</span>
-                            Guardar
-                        </button>
+                    <h3>Gestión de Usuarios</h3>
+                    <div class="user-management">
+                        <div class="user-form">
+                            <div class="form-group">
+                                <label class="form-label">Tipo de Usuario</label>
+                                <select id="tipoUsuario" class="form-select" onchange="toggleCamposUsuario()">
+                                    <option value="cajero">Cajero</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Nombre del Usuario</label>
+                                <input type="text" id="nombreUsuario" class="form-input" placeholder="Ej: Juan Pérez">
+                            </div>
+                            
+                            <div class="form-group" id="campoClaveAdmin">
+                                <label class="form-label">Clave de Administrador</label>
+                                <input type="password" id="claveAdminActual" class="form-input" placeholder="Para crear/editar administradores">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Contraseña</label>
+                                <input type="password" id="passwordUsuario" class="form-input" placeholder="Mínimo 4 caracteres">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Confirmar Contraseña</label>
+                                <input type="password" id="confirmPassword" class="form-input" placeholder="Repetir contraseña">
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-primary" onclick="guardarUsuario()">
+                                    <span class="material-icons">person_add</span>
+                                    Crear Usuario
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="limpiarFormularioUsuario()">
+                                    <span class="material-icons">clear</span>
+                                    Limpiar
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="users-list" id="listaUsuarios">
+                            <!-- Lista de usuarios se cargará aquí -->
+                        </div>
                     </div>
                 </div>
 
+                <!-- Configuración General -->
                 <div class="config-card">
-                    <h3>Tasa BCV</h3>
+                    <h3>Configuración General</h3>
                     <div class="config-form">
-                        <input type="number" id="tasaBCV" class="form-input" placeholder="Tasa BCV" step="0.0001">
-                        <button class="btn btn-primary" onclick="actualizarTasaBCV()">
-                            <span class="material-icons">update</span>
-                            Actualizar
-                        </button>
+                        <div class="form-group">
+                            <label class="form-label">Nombre del Establecimiento</label>
+                            <input type="text" id="nombreEstablecimiento" class="form-input" placeholder="Ej: Tienda La Bendición">
+                            <button class="btn btn-primary" onclick="guardarNombreEstablecimiento()">
+                                <span class="material-icons">save</span>
+                                Guardar
+                            </button>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Tasa BCV</label>
+                            <input type="number" id="tasaBCV" class="form-input" placeholder="Tasa BCV" step="0.0001">
+                            <button class="btn btn-primary" onclick="actualizarTasaBCV()">
+                                <span class="material-icons">update</span>
+                                Actualizar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
+                <!-- Respaldo de Datos -->
                 <div class="config-card">
                     <h3>Respaldo de Datos</h3>
                     <div class="config-actions">
@@ -458,10 +515,80 @@
                         </button>
                         <input type="file" id="fileInput" accept=".json" style="display: none" onchange="cargarBackup(this.files)">
                     </div>
+                    
+                    <div class="recovery-options" style="margin-top: 20px;">
+                        <h4>Recuperar Contraseñas</h4>
+                        <button class="btn btn-warning" onclick="mostrarModalRecuperacion()">
+                            <span class="material-icons">lock_reset</span>
+                            Recuperar Acceso
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- Modal de Login -->
+    <div id="modalLogin" class="modal" style="display: block;">
+        <div class="modal-content">
+            <div class="login-header">
+                <span class="material-icons">lock</span>
+                <h3>Iniciar Sesión</h3>
+                <p>Seleccione su usuario para comenzar</p>
+            </div>
+            
+            <div class="login-options" id="loginOptions">
+                <!-- Los usuarios se cargarán aquí -->
+            </div>
+            
+            <div class="login-actions">
+                <button class="btn btn-primary" onclick="mostrarCrearUsuario()">
+                    <span class="material-icons">person_add</span>
+                    Crear Nuevo Usuario
+                </button>
+                <button class="btn btn-secondary" onclick="modoDemo()">
+                    <span class="material-icons">play_arrow</span>
+                    Modo Demo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Crear Usuario Rápido -->
+    <div id="modalCrearUsuario" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModalCrearUsuario()">&times;</span>
+            <h3>Crear Usuario Rápido</h3>
+            
+            <div class="form-group">
+                <label class="form-label">Nombre del Usuario</label>
+                <input type="text" id="nombreUsuarioRapido" class="form-input" placeholder="Ej: María González">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Tipo de Usuario</label>
+                <select id="tipoUsuarioRapido" class="form-select">
+                    <option value="cajero">Cajero</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="passwordUsuarioRapido" class="form-input" placeholder="Mínimo 4 caracteres">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="btn btn-success" onclick="crearUsuarioRapido()">
+                    <span class="material-icons">check</span>
+                    Crear Usuario
+                </button>
+                <button class="btn btn-secondary" onclick="cerrarModalCrearUsuario()">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal de Métodos de Pago -->
     <div id="modalPago" class="modal">
@@ -494,7 +621,7 @@
         </div>
     </div>
 
-    <!-- Modal Reporte Diario -->
+    <!-- Modal Reporte Diario MEJORADO -->
     <div id="modalReporte" class="modal">
         <div class="modal-content">
             <span class="close" onclick="cerrarModalReporte()">&times;</span>
@@ -523,9 +650,17 @@
                     <label class="form-label">Seleccionar Fecha:</label>
                     <input type="date" id="fechaReporte" class="form-input" max="">
                 </div>
-                <button onclick="generarReportePorFecha()" class="btn btn-primary" style="width: 100%; margin-top: 15px;">
-                    Generar Reporte
-                </button>
+                
+                <div class="export-options" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                    <button onclick="generarReportePDF()" class="btn btn-primary">
+                        <span class="material-icons">picture_as_pdf</span>
+                        Exportar a PDF
+                    </button>
+                    <button onclick="generarReporteExcel()" class="btn btn-success">
+                        <span class="material-icons">table_chart</span>
+                        Exportar a Excel
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -596,6 +731,46 @@
                 <button onclick="generarEtiquetasPorCategoria('hortalizas')" class="categoria-btn">HORTALIZAS</button>
                 <button onclick="generarEtiquetasPorCategoria('aliños')" class="categoria-btn">ALIÑOS</button>
                 <button onclick="generarEtiquetasPorCategoria('otros')" class="categoria-btn">OTROS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Recuperación de Contraseñas -->
+    <div id="modalRecuperacion" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModalRecuperacion()">&times;</span>
+            <h3>Recuperar Acceso al Sistema</h3>
+            
+            <div class="recovery-steps">
+                <div class="step">
+                    <h4>Paso 1: Verificar Identidad</h4>
+                    <div class="form-group">
+                        <label class="form-label">Correo de Recuperación</label>
+                        <input type="email" id="emailRecuperacion" class="form-input" placeholder="tu@email.com">
+                    </div>
+                    <button class="btn btn-primary" onclick="verificarIdentidad()">
+                        Verificar Identidad
+                    </button>
+                </div>
+                
+                <div class="step" id="stepReset" style="display: none; margin-top: 20px;">
+                    <h4>Paso 2: Restablecer Contraseña</h4>
+                    <div class="form-group">
+                        <label class="form-label">Nueva Contraseña</label>
+                        <input type="password" id="nuevaPassword" class="form-input" placeholder="Nueva contraseña">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirmar Nueva Contraseña</label>
+                        <input type="password" id="confirmNuevaPassword" class="form-input" placeholder="Confirmar contraseña">
+                    </div>
+                    <button class="btn btn-success" onclick="restablecerPassword()">
+                        Restablecer Contraseña
+                    </button>
+                </div>
+            </div>
+            
+            <div class="recovery-info">
+                <p><strong>Nota:</strong> Este proceso restablecerá todas las contraseñas del sistema. Use con precaución.</p>
             </div>
         </div>
     </div>
