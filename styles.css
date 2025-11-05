@@ -454,6 +454,11 @@ body {
     color: white;
 }
 
+.btn-warning {
+    background: var(--warning-color);
+    color: white;
+}
+
 .btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.2);
@@ -781,6 +786,292 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+/* ===== ESTILOS PARA GESTIÓN DE USUARIOS ===== */
+.user-management {
+    display: grid;
+    gap: 20px;
+}
+
+.user-form {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.users-list {
+    margin-top: 20px;
+}
+
+.user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: white;
+}
+
+.user-info h4 {
+    margin: 0 0 4px 0;
+    color: var(--text-primary);
+}
+
+.user-info p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.user-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.badge-admin {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.badge-cajero {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 32px;
+}
+
+/* ===== ESTILOS PARA LOGIN ===== */
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-header .material-icons {
+    font-size: 48px;
+    color: var(--primary-color);
+    margin-bottom: 16px;
+}
+
+.login-header h3 {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.login-header p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+.login-options {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 24px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.user-login-option {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.user-login-option:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.user-login-option.active {
+    border-color: var(--primary-color);
+    background: #e8f0fe;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.user-login-info {
+    flex: 1;
+}
+
+.user-login-info h4 {
+    margin: 0 0 4px 0;
+    color: var(--text-primary);
+}
+
+.user-login-info p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.user-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.status-online {
+    color: var(--secondary-color);
+}
+
+.status-offline {
+    color: var(--text-secondary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-online .status-dot {
+    background: var(--secondary-color);
+}
+
+.status-offline .status-dot {
+    background: var(--text-secondary);
+}
+
+.login-actions {
+    display: grid;
+    gap: 12px;
+}
+
+/* Indicador de usuario activo */
+.user-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.user-indicator .material-icons {
+    font-size: 16px;
+}
+
+/* Sesión activa */
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.session-timer {
+    background: #fff3e0;
+    color: #e65100;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+/* Mejoras para el modal de login */
+#modalLogin .modal-content {
+    max-width: 400px;
+}
+
+/* Estado del sistema */
+.system-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #e8f5e8;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #2e7d32;
+}
+
+/* Estilos para recuperación */
+.recovery-steps {
+    border-left: 4px solid var(--primary-color);
+    padding-left: 16px;
+}
+
+.step {
+    margin-bottom: 20px;
+}
+
+.recovery-info {
+    margin-top: 20px;
+    padding: 12px;
+    background: #fff3e0;
+    border-radius: 6px;
+    border-left: 4px solid var(--warning-color);
+}
+
+.recovery-info p {
+    margin: 0;
+    font-size: 12px;
+    color: #e65100;
+}
+
+/* Opciones de exportación */
+.export-options {
+    margin-top: 20px;
+}
+
+.export-options .btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    min-height: 80px;
+}
+
+/* Indicador de seguridad */
+.security-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #e8f5e8;
+    border-radius: 12px;
+    font-size: 10px;
+    color: #2e7d32;
+    margin-left: 8px;
 }
 
 /* Modales */
@@ -1215,6 +1506,31 @@ body {
     
     .metodos-pago {
         grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .user-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .user-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    
+    .export-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .user-login-option {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+    
+    .user-login-info {
+        text-align: center;
     }
     
     /* Mostrar botón de regreso en móviles */
